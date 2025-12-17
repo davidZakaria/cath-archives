@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import Document from '@/models/Document';
 import Batch from '@/models/Batch';
-import { processDocumentWithAI } from '@/lib/ai-agent';
+import { processDocumentWithAI, AIModel, AI_MODELS } from '@/lib/ai-agent';
 import mongoose from 'mongoose';
 
 export async function POST(
@@ -12,6 +12,17 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    
+    // Parse request body for model selection (optional)
+    let model: AIModel = 'gpt-4o-mini'; // Default to minimal cost
+    try {
+      const body = await request.json();
+      if (body.model && AI_MODELS[body.model as AIModel]) {
+        model = body.model as AIModel;
+      }
+    } catch {
+      // No body or invalid JSON - use default model
+    }
 
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -46,8 +57,8 @@ export async function POST(
     });
 
     try {
-      // Process with AI
-      const result = await processDocumentWithAI(document.ocrText, id);
+      // Process with AI using selected model (defaults to gpt-4o-mini for minimal cost)
+      const result = await processDocumentWithAI(document.ocrText, id, { model });
 
       // Update document with AI results
       const updatedDocument = await Document.findByIdAndUpdate(
@@ -88,6 +99,8 @@ export async function POST(
           processingStatus: updatedDocument!.processingStatus,
         },
         confidence: result.confidence,
+        modelUsed: result.modelUsed,
+        estimatedCost: result.estimatedCost,
       });
     } catch (aiError) {
       // Update status to failed

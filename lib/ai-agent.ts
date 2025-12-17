@@ -2,6 +2,41 @@
 import OpenAI from 'openai';
 import { FormattedArticle, ArticleMetadata, Dialogue } from '@/types';
 
+// Model options for different cost/accuracy trade-offs
+export type AIModel = 'gpt-4o-mini' | 'gpt-4o' | 'gpt-4-turbo-preview';
+
+export interface AIModelConfig {
+  model: AIModel;
+  inputCostPer1M: number;
+  outputCostPer1M: number;
+  description: string;
+}
+
+// Model configurations with pricing (as of Dec 2024)
+export const AI_MODELS: Record<AIModel, AIModelConfig> = {
+  'gpt-4o-mini': {
+    model: 'gpt-4o-mini',
+    inputCostPer1M: 0.15,
+    outputCostPer1M: 0.60,
+    description: 'Most cost-effective - great for Arabic text correction (~100x cheaper than GPT-4)',
+  },
+  'gpt-4o': {
+    model: 'gpt-4o',
+    inputCostPer1M: 2.50,
+    outputCostPer1M: 10.00,
+    description: 'Balanced - good accuracy at moderate cost',
+  },
+  'gpt-4-turbo-preview': {
+    model: 'gpt-4-turbo-preview',
+    inputCostPer1M: 10.00,
+    outputCostPer1M: 30.00,
+    description: 'Highest accuracy - most expensive',
+  },
+};
+
+// Default to minimal cost model
+const DEFAULT_MODEL: AIModel = 'gpt-4o-mini';
+
 // Initialize OpenAI client
 const getOpenAIClient = () => {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -35,18 +70,30 @@ export interface AIProcessingResult {
   formattedContent: FormattedArticle;
   metadata: ArticleMetadata;
   confidence: number;
+  modelUsed: AIModel;
+  estimatedCost: number;
+}
+
+export interface ProcessingOptions {
+  model?: AIModel;
+  minimalCost?: boolean; // Shorthand for using gpt-4o-mini
 }
 
 // Main function to process a document with AI
 export async function processDocumentWithAI(
   ocrText: string,
-  documentId?: string
+  documentId?: string,
+  options: ProcessingOptions = {}
 ): Promise<AIProcessingResult> {
   const client = getOpenAIClient();
   
+  // Use minimal cost model by default, or specified model
+  const model: AIModel = options.model || (options.minimalCost !== false ? 'gpt-4o-mini' : DEFAULT_MODEL);
+  const modelConfig = AI_MODELS[model];
+  
   try {
     const response = await client.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: model,
       messages: [
         {
           role: 'system',
@@ -85,10 +132,19 @@ ${ocrText}`,
     const content = response.choices[0]?.message?.content;
     
     if (!content) {
-      throw new Error('Empty response from GPT-4');
+      throw new Error(`Empty response from ${model}`);
     }
 
     const result = JSON.parse(content);
+    
+    // Calculate estimated cost
+    const inputTokens = response.usage?.prompt_tokens || 0;
+    const outputTokens = response.usage?.completion_tokens || 0;
+    const estimatedCost = 
+      (inputTokens / 1000000) * modelConfig.inputCostPer1M +
+      (outputTokens / 1000000) * modelConfig.outputCostPer1M;
+    
+    console.log(`[AI Agent] Model: ${model}, Input tokens: ${inputTokens}, Output tokens: ${outputTokens}, Cost: $${estimatedCost.toFixed(6)}`);
     
     // Validate and normalize the result
     return {
@@ -107,6 +163,8 @@ ${ocrText}`,
         source: result.metadata?.source || undefined,
       },
       confidence: typeof result.confidence === 'number' ? result.confidence : 0.8,
+      modelUsed: model,
+      estimatedCost: estimatedCost,
     };
   } catch (error) {
     console.error(`AI processing failed for document ${documentId}:`, error);
@@ -114,13 +172,14 @@ ${ocrText}`,
   }
 }
 
-// Correct OCR text only (lighter operation)
-export async function correctOCRText(ocrText: string): Promise<string> {
+// Correct OCR text only (lighter operation) - uses minimal cost model by default
+export async function correctOCRText(ocrText: string, model: AIModel = 'gpt-4o-mini'): Promise<{ text: string; cost: number }> {
   const client = getOpenAIClient();
+  const modelConfig = AI_MODELS[model];
   
   try {
     const response = await client.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: model,
       messages: [
         {
           role: 'system',
@@ -141,20 +200,32 @@ Return ONLY the corrected Arabic text with no explanations.`,
       max_tokens: 4000,
     });
 
-    return response.choices[0]?.message?.content || ocrText;
+    const inputTokens = response.usage?.prompt_tokens || 0;
+    const outputTokens = response.usage?.completion_tokens || 0;
+    const cost = 
+      (inputTokens / 1000000) * modelConfig.inputCostPer1M +
+      (outputTokens / 1000000) * modelConfig.outputCostPer1M;
+
+    console.log(`[OCR Correction] Model: ${model}, Cost: $${cost.toFixed(6)}`);
+    
+    return { 
+      text: response.choices[0]?.message?.content || ocrText,
+      cost 
+    };
   } catch (error) {
     console.error('OCR correction failed:', error);
-    return ocrText; // Return original if correction fails
+    return { text: ocrText, cost: 0 }; // Return original if correction fails
   }
 }
 
-// Extract article structure from text
-export async function formatArticle(text: string): Promise<FormattedArticle> {
+// Extract article structure from text - uses minimal cost model by default
+export async function formatArticle(text: string, model: AIModel = 'gpt-4o-mini'): Promise<FormattedArticle & { cost: number }> {
   const client = getOpenAIClient();
+  const modelConfig = AI_MODELS[model];
   
   try {
     const response = await client.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: model,
       messages: [
         {
           role: 'system',
@@ -178,8 +249,14 @@ Return ONLY valid JSON.`,
       max_tokens: 3000,
     });
 
+    const inputTokens = response.usage?.prompt_tokens || 0;
+    const outputTokens = response.usage?.completion_tokens || 0;
+    const cost = 
+      (inputTokens / 1000000) * modelConfig.inputCostPer1M +
+      (outputTokens / 1000000) * modelConfig.outputCostPer1M;
+
     const content = response.choices[0]?.message?.content;
-    if (!content) return { body: text };
+    if (!content) return { body: text, cost };
 
     const result = JSON.parse(content);
     return {
@@ -188,20 +265,22 @@ Return ONLY valid JSON.`,
       body: result.body || text,
       dialogues: normalizeDialogues(result.dialogues),
       credits: result.credits,
+      cost,
     };
   } catch (error) {
     console.error('Article formatting failed:', error);
-    return { body: text };
+    return { body: text, cost: 0 };
   }
 }
 
-// Extract metadata (movies, characters, dates)
-export async function extractMetadata(text: string): Promise<ArticleMetadata> {
+// Extract metadata (movies, characters, dates) - uses minimal cost model by default
+export async function extractMetadata(text: string, model: AIModel = 'gpt-4o-mini'): Promise<ArticleMetadata & { cost: number }> {
   const client = getOpenAIClient();
+  const modelConfig = AI_MODELS[model];
   
   try {
     const response = await client.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: model,
       messages: [
         {
           role: 'system',
@@ -224,13 +303,19 @@ Return ONLY valid JSON.`,
       max_tokens: 1000,
     });
 
-    const content = response.choices[0]?.message?.content;
-    if (!content) return {};
+    const inputTokens = response.usage?.prompt_tokens || 0;
+    const outputTokens = response.usage?.completion_tokens || 0;
+    const cost = 
+      (inputTokens / 1000000) * modelConfig.inputCostPer1M +
+      (outputTokens / 1000000) * modelConfig.outputCostPer1M;
 
-    return JSON.parse(content);
+    const content = response.choices[0]?.message?.content;
+    if (!content) return { cost };
+
+    return { ...JSON.parse(content), cost };
   } catch (error) {
     console.error('Metadata extraction failed:', error);
-    return {};
+    return { cost: 0 };
   }
 }
 
@@ -248,16 +333,21 @@ function normalizeDialogues(dialogues: unknown): Dialogue[] {
     }));
 }
 
-// Batch process multiple documents (with rate limiting)
+// Batch process multiple documents (with rate limiting) - uses minimal cost model by default
 export async function batchProcessDocuments(
   documents: Array<{ id: string; ocrText: string }>,
-  onProgress?: (processed: number, total: number) => void
-): Promise<Map<string, AIProcessingResult>> {
+  options: ProcessingOptions = {},
+  onProgress?: (processed: number, total: number, totalCost: number) => void
+): Promise<{ results: Map<string, AIProcessingResult>; totalCost: number }> {
   const results = new Map<string, AIProcessingResult>();
   const total = documents.length;
+  let totalCost = 0;
   
-  // Process in batches of 3 to respect rate limits
-  const batchSize = 3;
+  // Process in batches of 5 for gpt-4o-mini (higher rate limits)
+  const model = options.model || 'gpt-4o-mini';
+  const batchSize = model === 'gpt-4o-mini' ? 5 : 3;
+  
+  console.log(`[Batch Processing] Starting ${total} documents with ${model}`);
   
   for (let i = 0; i < documents.length; i += batchSize) {
     const batch = documents.slice(i, i + batchSize);
@@ -265,7 +355,7 @@ export async function batchProcessDocuments(
     const batchResults = await Promise.all(
       batch.map(async (doc) => {
         try {
-          const result = await processDocumentWithAI(doc.ocrText, doc.id);
+          const result = await processDocumentWithAI(doc.ocrText, doc.id, options);
           return { id: doc.id, result, success: true };
         } catch (error) {
           console.error(`Failed to process document ${doc.id}:`, error);
@@ -277,27 +367,36 @@ export async function batchProcessDocuments(
     for (const { id, result, success } of batchResults) {
       if (success && result) {
         results.set(id, result);
+        totalCost += result.estimatedCost;
       }
     }
     
     if (onProgress) {
-      onProgress(Math.min(i + batchSize, total), total);
+      onProgress(Math.min(i + batchSize, total), total, totalCost);
     }
     
-    // Rate limiting delay between batches
+    // Rate limiting delay between batches (shorter for gpt-4o-mini)
     if (i + batchSize < documents.length) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, model === 'gpt-4o-mini' ? 500 : 1000));
     }
   }
   
-  return results;
+  console.log(`[Batch Processing] Completed ${results.size}/${total} documents. Total cost: $${totalCost.toFixed(4)}`);
+  
+  return { results, totalCost };
 }
 
-// Estimate cost for processing documents
-export function estimateProcessingCost(documentCount: number, avgTextLength: number = 2000): {
+// Estimate cost for processing documents with different models
+export function estimateProcessingCost(
+  documentCount: number, 
+  avgTextLength: number = 2000,
+  model: AIModel = 'gpt-4o-mini'
+): {
   inputTokens: number;
   outputTokens: number;
   estimatedCost: number;
+  model: AIModel;
+  costComparison: Record<AIModel, number>;
 } {
   // Rough token estimation: ~4 chars per token for Arabic
   const avgInputTokens = Math.ceil(avgTextLength / 4) + 500; // +500 for system prompt
@@ -306,13 +405,106 @@ export function estimateProcessingCost(documentCount: number, avgTextLength: num
   const totalInputTokens = avgInputTokens * documentCount;
   const totalOutputTokens = avgOutputTokens * documentCount;
   
-  // GPT-4 Turbo pricing (as of 2024): $10/1M input, $30/1M output
-  const inputCost = (totalInputTokens / 1000000) * 10;
-  const outputCost = (totalOutputTokens / 1000000) * 30;
+  const modelConfig = AI_MODELS[model];
+  const inputCost = (totalInputTokens / 1000000) * modelConfig.inputCostPer1M;
+  const outputCost = (totalOutputTokens / 1000000) * modelConfig.outputCostPer1M;
+  
+  // Calculate comparison for all models
+  const costComparison: Record<AIModel, number> = {} as Record<AIModel, number>;
+  for (const [modelName, config] of Object.entries(AI_MODELS)) {
+    const cost = 
+      (totalInputTokens / 1000000) * config.inputCostPer1M +
+      (totalOutputTokens / 1000000) * config.outputCostPer1M;
+    costComparison[modelName as AIModel] = Math.round(cost * 100) / 100;
+  }
   
   return {
     inputTokens: totalInputTokens,
     outputTokens: totalOutputTokens,
     estimatedCost: Math.round((inputCost + outputCost) * 100) / 100,
+    model,
+    costComparison,
   };
+}
+
+// Quick function to verify historical text accuracy with minimal cost
+export async function verifyHistoricalAccuracy(
+  ocrText: string,
+  options: { model?: AIModel } = {}
+): Promise<{
+  isAccurate: boolean;
+  correctedText: string;
+  corrections: Array<{ original: string; corrected: string; reason: string }>;
+  confidence: number;
+  cost: number;
+}> {
+  const client = getOpenAIClient();
+  const model = options.model || 'gpt-4o-mini';
+  const modelConfig = AI_MODELS[model];
+  
+  try {
+    const response = await client.chat.completions.create({
+      model: model,
+      messages: [
+        {
+          role: 'system',
+          content: `You are an expert in Arabic historical texts and cinema archives. Analyze the OCR text for accuracy and identify any errors.
+
+Focus on:
+1. Historical accuracy of names, dates, and events mentioned
+2. OCR errors in Arabic text (common character confusions)
+3. Grammatical corrections while preserving historical language style
+4. Movie titles and actor names verification
+
+Return JSON:
+{
+  "isAccurate": true/false (true if text is mostly accurate with minor issues),
+  "correctedText": "the full corrected text",
+  "corrections": [
+    {"original": "wrong text", "corrected": "right text", "reason": "why it was corrected"}
+  ],
+  "confidence": 0.0 to 1.0
+}`,
+        },
+        {
+          role: 'user',
+          content: ocrText,
+        },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.2,
+      max_tokens: 4000,
+    });
+
+    const inputTokens = response.usage?.prompt_tokens || 0;
+    const outputTokens = response.usage?.completion_tokens || 0;
+    const cost = 
+      (inputTokens / 1000000) * modelConfig.inputCostPer1M +
+      (outputTokens / 1000000) * modelConfig.outputCostPer1M;
+
+    console.log(`[Historical Verification] Model: ${model}, Cost: $${cost.toFixed(6)}`);
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      return {
+        isAccurate: false,
+        correctedText: ocrText,
+        corrections: [],
+        confidence: 0,
+        cost,
+      };
+    }
+
+    const result = JSON.parse(content);
+    return {
+      isAccurate: result.isAccurate ?? false,
+      correctedText: result.correctedText || ocrText,
+      corrections: result.corrections || [],
+      confidence: result.confidence ?? 0.5,
+      cost,
+    };
+  } catch (error) {
+    console.error('Historical verification failed:', error);
+    throw new Error(`Historical verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
