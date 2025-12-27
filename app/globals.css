@@ -1,26 +1,713 @@
 @import "tailwindcss";
 
+/* ========================================
+   روتانا سينما زمان - Egyptian Golden Age
+   Inspired by Classic Egyptian Cinema & Heritage
+   ======================================== */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Rotana Zaman Palette - Rich & Nostalgic */
+  --rotana-gold: #c9a227;
+  --rotana-gold-light: #e8d48b;
+  --rotana-gold-dark: #8b7319;
+  --rotana-burgundy: #6b1c23;
+  --rotana-burgundy-light: #8b2c35;
+  --rotana-burgundy-dark: #4a1218;
+  
+  /* Egyptian Heritage Colors */
+  --pharaoh-gold: #d4af37;
+  --nile-blue: #1a3a5c;
+  --papyrus: #f4e4bc;
+  --desert-sand: #c2a366;
+  --lotus-pink: #e8b4b8;
+  --kohl-black: #1a1612;
+  
+  /* Sepia Film Tones */
+  --sepia-50: #faf8f3;
+  --sepia-100: #f5f0e3;
+  --sepia-200: #e8dcc4;
+  --sepia-300: #d4c4a0;
+  --sepia-400: #b8a070;
+  --sepia-500: #9c8550;
+  --sepia-600: #7a6540;
+  --sepia-700: #5c4a30;
+  --sepia-800: #3d3020;
+  --sepia-900: #1f1810;
+  
+  /* Background */
+  --background: #0f0c08;
+  --foreground: #f5f0e3;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: 'Amiri', 'Noto Naskh Arabic', serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* Base Styles */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Amiri', 'Noto Naskh Arabic', 'Georgia', serif;
+}
+
+/* Egyptian Geometric Pattern */
+.egyptian-pattern {
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 30L30 60L0 30L30 0z' fill='none' stroke='%23c9a22720' stroke-width='1'/%3E%3Cpath d='M30 10L50 30L30 50L10 30L30 10z' fill='none' stroke='%23c9a22715' stroke-width='1'/%3E%3C/svg%3E");
+}
+
+/* Lotus Pattern Decoration */
+.lotus-pattern {
+  background-image: url("data:image/svg+xml,%3Csvg width='80' height='40' viewBox='0 0 80 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M40 0c-5 10-15 20-20 20s-15-10-20-20M40 0c5 10 15 20 20 20s15-10 20-20' fill='none' stroke='%23c9a22730' stroke-width='1'/%3E%3C/svg%3E");
+  background-size: 80px 40px;
+}
+
+/* Papyrus Texture Effect */
+.papyrus-bg {
+  background: 
+    linear-gradient(135deg, rgba(244, 228, 188, 0.03) 0%, transparent 50%),
+    linear-gradient(225deg, rgba(201, 162, 39, 0.05) 0%, transparent 50%),
+    var(--background);
+}
+
+/* Film Grain Overlay */
+.film-grain::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  opacity: 0.04;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  z-index: 1;
+}
+
+/* Film Reel Sprockets */
+.film-sprockets {
+  background-image: 
+    linear-gradient(to bottom, 
+      transparent 0px, 
+      transparent 3px, 
+      rgba(201, 162, 39, 0.3) 3px, 
+      rgba(201, 162, 39, 0.3) 7px, 
+      transparent 7px, 
+      transparent 13px
+    );
+  background-size: 100% 13px;
+}
+
+/* Rotana Cinema Header Style */
+.rotana-header {
+  background: linear-gradient(180deg, 
+    var(--rotana-burgundy-dark) 0%, 
+    var(--kohl-black) 100%
+  );
+  border-bottom: 3px solid var(--rotana-gold);
+  position: relative;
+}
+
+.rotana-header::before {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--rotana-gold-dark) 0px,
+    var(--rotana-gold-dark) 15px,
+    transparent 15px,
+    transparent 20px
+  );
+}
+
+/* Art Deco Divider */
+.art-deco-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.art-deco-divider::before,
+.art-deco-divider::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent, 
+    var(--rotana-gold) 20%, 
+    var(--rotana-gold) 80%, 
+    transparent
+  );
+}
+
+/* Pharaonic Gold Border */
+.pharaoh-border {
+  border: 2px solid var(--pharaoh-gold);
+  box-shadow: 
+    inset 0 0 20px rgba(212, 175, 55, 0.1),
+    0 0 30px rgba(212, 175, 55, 0.1);
+}
+
+/* Vintage Card - Rotana Style */
+.vintage-card {
+  background: linear-gradient(145deg, 
+    rgba(26, 22, 18, 0.95) 0%, 
+    rgba(15, 12, 8, 0.98) 100%
+  );
+  border: 2px solid var(--rotana-gold-dark);
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(201, 162, 39, 0.1);
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.vintage-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, 
+    transparent, 
+    var(--rotana-gold) 30%, 
+    var(--rotana-gold) 70%, 
+    transparent
+  );
+}
+
+.vintage-card:hover {
+  border-color: var(--rotana-gold);
+  box-shadow: 
+    0 8px 40px rgba(0, 0, 0, 0.6),
+    0 0 30px rgba(201, 162, 39, 0.15),
+    inset 0 1px 0 rgba(201, 162, 39, 0.2);
+}
+
+/* Cinema Curtain Effect */
+.cinema-curtain {
+  background: linear-gradient(90deg, 
+    var(--rotana-burgundy) 0%, 
+    var(--rotana-burgundy-dark) 5%,
+    transparent 15%, 
+    transparent 85%, 
+    var(--rotana-burgundy-dark) 95%,
+    var(--rotana-burgundy) 100%
+  );
+}
+
+/* Spotlight Effect */
+.spotlight {
+  position: relative;
+}
+
+.spotlight::before {
+  content: '';
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 150%;
+  height: 500px;
+  background: radial-gradient(ellipse at center top, 
+    rgba(201, 162, 39, 0.12) 0%, 
+    rgba(201, 162, 39, 0.05) 30%,
+    transparent 60%
+  );
+  pointer-events: none;
+}
+
+/* Golden Buttons - Rotana Style */
+.btn-rotana {
+  background: linear-gradient(180deg, 
+    var(--rotana-gold) 0%, 
+    var(--rotana-gold-dark) 100%
+  );
+  color: var(--kohl-black);
+  font-weight: 700;
+  border: 2px solid var(--rotana-gold-light);
+  box-shadow: 
+    0 4px 15px rgba(201, 162, 39, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.btn-rotana:hover {
+  background: linear-gradient(180deg, 
+    var(--rotana-gold-light) 0%, 
+    var(--rotana-gold) 100%
+  );
+  box-shadow: 
+    0 6px 25px rgba(201, 162, 39, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.btn-burgundy {
+  background: linear-gradient(180deg, 
+    var(--rotana-burgundy) 0%, 
+    var(--rotana-burgundy-dark) 100%
+  );
+  color: var(--rotana-gold-light);
+  font-weight: 600;
+  border: 2px solid var(--rotana-burgundy-light);
+  box-shadow: 0 4px 15px rgba(107, 28, 35, 0.3);
+  transition: all 0.3s ease;
+}
+
+.btn-burgundy:hover {
+  background: linear-gradient(180deg, 
+    var(--rotana-burgundy-light) 0%, 
+    var(--rotana-burgundy) 100%
+  );
+  box-shadow: 0 6px 20px rgba(107, 28, 35, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn-outline-gold {
+  background: transparent;
+  color: var(--rotana-gold);
+  border: 2px solid var(--rotana-gold-dark);
+  transition: all 0.3s ease;
+}
+
+.btn-outline-gold:hover {
+  background: rgba(201, 162, 39, 0.1);
+  border-color: var(--rotana-gold);
+  color: var(--rotana-gold-light);
+  box-shadow: 0 0 20px rgba(201, 162, 39, 0.2);
+}
+
+/* Also keep btn-gold as alias */
+.btn-gold {
+  background: linear-gradient(180deg, 
+    var(--rotana-gold) 0%, 
+    var(--rotana-gold-dark) 100%
+  );
+  color: var(--kohl-black);
+  font-weight: 700;
+  border: 2px solid var(--rotana-gold-light);
+  box-shadow: 
+    0 4px 15px rgba(201, 162, 39, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.btn-gold:hover {
+  background: linear-gradient(180deg, 
+    var(--rotana-gold-light) 0%, 
+    var(--rotana-gold) 100%
+  );
+  transform: translateY(-2px);
+}
+
+/* Vintage Input */
+.vintage-input {
+  background: rgba(15, 12, 8, 0.9);
+  border: 2px solid var(--rotana-gold-dark);
+  color: var(--sepia-100);
+  transition: all 0.3s ease;
+}
+
+.vintage-input:focus {
+  border-color: var(--rotana-gold);
+  box-shadow: 0 0 20px rgba(201, 162, 39, 0.2);
+  outline: none;
+}
+
+.vintage-input::placeholder {
+  color: var(--sepia-500);
+}
+
+/* Status Badges */
+.badge-pending {
+  background: linear-gradient(180deg, #3a3528 0%, #2a2518 100%);
+  color: var(--rotana-gold);
+  border: 1px solid var(--rotana-gold-dark);
+}
+
+.badge-progress {
+  background: linear-gradient(180deg, #4a3f20 0%, #3a3018 100%);
+  color: var(--rotana-gold-light);
+  border: 1px solid var(--rotana-gold);
+}
+
+.badge-complete {
+  background: linear-gradient(180deg, #2a4a2a 0%, #1a3a1a 100%);
+  color: #90ee90;
+  border: 1px solid #4a8a4a;
+}
+
+/* Star Rating Decoration */
+.star-rating {
+  color: var(--rotana-gold);
+  text-shadow: 0 0 10px rgba(201, 162, 39, 0.5);
+}
+
+/* Decorative Dividers */
+.star-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.star-divider::before,
+.star-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--rotana-gold), transparent);
+}
+
+/* Hieroglyphic-style Border (subtle) */
+.hieroglyph-border {
+  position: relative;
+}
+
+.hieroglyph-border::before {
+  content: '𓂀 𓃭 𓆣 𓇋 𓈖 𓊪 𓋴 𓌳';
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: var(--rotana-gold-dark);
+  opacity: 0.3;
+  letter-spacing: 10px;
+}
+
+/* Nile Wave Pattern */
+.nile-wave {
+  background-image: url("data:image/svg+xml,%3Csvg width='100' height='20' viewBox='0 0 100 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 10c10-5 20-5 30 0s20 5 30 0 20-5 30 0 20 5 30 0' fill='none' stroke='%231a3a5c30' stroke-width='2'/%3E%3C/svg%3E");
+  background-size: 100px 20px;
+}
+
+/* Film Title Style */
+.film-title {
+  color: var(--rotana-gold);
+  text-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.5),
+    0 0 30px rgba(201, 162, 39, 0.3),
+    0 0 60px rgba(201, 162, 39, 0.1);
+  letter-spacing: 0.05em;
+}
+
+/* Vintage Photo Frame */
+.photo-frame {
+  border: 4px solid var(--sepia-400);
+  box-shadow: 
+    inset 0 0 20px rgba(0, 0, 0, 0.3),
+    0 4px 20px rgba(0, 0, 0, 0.4);
+  position: relative;
+}
+
+.photo-frame::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid var(--sepia-300);
+  pointer-events: none;
+}
+
+/* Movie Poster Style */
+.movie-poster {
+  position: relative;
+  overflow: hidden;
+}
+
+.movie-poster::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, 
+    transparent 50%,
+    rgba(15, 12, 8, 0.7) 80%,
+    rgba(15, 12, 8, 0.95) 100%
+  );
+  pointer-events: none;
+}
+
+/* Vintage Scrollbar */
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--kohl-black);
+  border-left: 1px solid var(--rotana-gold-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, 
+    var(--rotana-gold-dark) 0%, 
+    var(--sepia-700) 100%
+  );
+  border-radius: 7px;
+  border: 3px solid var(--kohl-black);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, 
+    var(--rotana-gold) 0%, 
+    var(--rotana-gold-dark) 100%
+  );
+}
+
+/* Text Styles */
+.text-rotana-gold {
+  color: var(--rotana-gold);
+}
+
+.text-papyrus {
+  color: var(--papyrus);
+}
+
+.text-sepia {
+  color: var(--sepia-300);
+}
+
+/* Loading Spinner - Film Reel */
+@keyframes film-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.film-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid var(--rotana-gold-dark);
+  border-top-color: var(--rotana-gold);
+  border-radius: 50%;
+  animation: film-spin 1s linear infinite;
+  position: relative;
+}
+
+.film-spinner::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border: 2px solid var(--rotana-gold-dark);
+  border-radius: 50%;
+}
+
+/* Flickering Light Effect (subtle) */
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.95; }
+  75% { opacity: 0.98; }
+}
+
+.cinema-flicker {
+  animation: flicker 4s infinite;
+}
+
+/* Sepia Image Filter */
+.sepia-photo {
+  filter: sepia(30%) contrast(1.1) brightness(0.95);
+  transition: filter 0.3s ease;
+}
+
+.sepia-photo:hover {
+  filter: sepia(10%) contrast(1.05) brightness(1);
+}
+
+/* Classic Arabic Typography */
+.arabic-title {
+  font-family: 'Amiri', 'Noto Naskh Arabic', serif;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.arabic-body {
+  font-family: 'Amiri', 'Noto Naskh Arabic', serif;
+  font-weight: 400;
+  line-height: 1.8;
+}
+
+/* Decorative Corner Ornaments */
+.corner-ornament {
+  position: relative;
+}
+
+.corner-ornament::before,
+.corner-ornament::after {
+  content: '❧';
+  position: absolute;
+  color: var(--rotana-gold-dark);
+  font-size: 24px;
+  opacity: 0.5;
+}
+
+.corner-ornament::before {
+  top: 10px;
+  right: 10px;
+}
+
+.corner-ornament::after {
+  bottom: 10px;
+  left: 10px;
+  transform: rotate(180deg);
+}
+
+/* Vignette Effect */
+.vignette {
+  box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.5);
+}
+
+/* Old Film Border */
+.old-film-border {
+  border: 8px solid transparent;
+  border-image: repeating-linear-gradient(
+    90deg,
+    var(--sepia-700) 0px,
+    var(--sepia-700) 8px,
+    var(--kohl-black) 8px,
+    var(--kohl-black) 12px
+  ) 8;
+}
+
+/* Responsive Typography */
+@media (max-width: 768px) {
+  .film-title {
+    font-size: 1.75rem;
+  }
+}
+
+/* Print Styles - Vintage Newspaper Look */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  body {
+    background: #f9f6f0 !important;
+    color: #1a1612 !important;
+    font-family: 'Amiri', 'Georgia', serif !important;
+  }
+  
+  /* Hide non-printable elements */
+  header, footer, nav, .film-sprockets, .film-grain::before,
+  .btn-rotana, .btn-outline-gold, .btn-gold, .btn-burgundy,
+  button, input, select, .no-print {
+    display: none !important;
+  }
+  
+  /* Vintage card for print */
+  .vintage-card {
+    background: white !important;
+    border: 2px solid #c9a227 !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+  
+  /* Article title styling */
+  h1, h2, h3 {
+    color: #1a1612 !important;
+    border-bottom: 1px solid #c9a227;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  
+  h1 {
+    font-size: 2rem !important;
+    text-align: center;
+  }
+  
+  /* Decorative border for print */
+  .print-border {
+    border: 4px double #c9a227;
+    padding: 2rem;
+    margin: 1rem;
+  }
+  
+  /* Film frame decoration for images */
+  img {
+    border: 3px solid #3a3020;
+    padding: 2px;
+  }
+  
+  /* Quote styling */
+  blockquote {
+    border-right: 4px solid #c9a227 !important;
+    background: #f5f0e3 !important;
+    padding: 1rem !important;
+    margin: 1rem 0 !important;
+    font-style: italic;
+  }
+  
+  /* Page numbers */
+  @page {
+    margin: 2cm;
+    @bottom-center {
+      content: "سينما زمان - صفحة " counter(page);
+      font-family: 'Amiri', serif;
+      color: #8b7319;
+    }
+  }
+  
+  /* First page */
+  @page :first {
+    @top-center {
+      content: "أرشيف السينما المصرية - العصر الذهبي";
+      font-family: 'Amiri', serif;
+      font-size: 12pt;
+      color: #c9a227;
+    }
+  }
+  
+  /* Avoid page breaks */
+  .page-break-avoid {
+    page-break-inside: avoid;
+  }
+  
+  /* Force page break */
+  .page-break {
+    page-break-before: always;
+  }
+  
+  /* Links */
+  a {
+    color: #1a1612 !important;
+    text-decoration: none !important;
+  }
+  
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: #8b7319;
+  }
+}
+
+/* Art Deco Header - keep for compatibility */
+.art-deco-header {
+  background: linear-gradient(180deg, 
+    var(--rotana-burgundy-dark) 0%, 
+    var(--kohl-black) 100%
+  );
+  border-bottom: 3px solid var(--rotana-gold);
+  position: relative;
+}
+
+.art-deco-header::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--rotana-gold-dark) 0px,
+    var(--rotana-gold-dark) 15px,
+    transparent 15px,
+    transparent 20px
+  );
 }

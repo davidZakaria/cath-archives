@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="500" viewBox="0 0 400 500">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2a2820"/>
+      <stop offset="50%" style="stop-color:#1a1612"/>
+      <stop offset="100%" style="stop-color:#2a2820"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#c9b86a"/>
+      <stop offset="100%" style="stop-color:#c9a227"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="500" fill="url(#bg)"/>
+  <circle cx="200" cy="180" r="100" fill="#3a3020" stroke="url(#accent)" stroke-width="3"/>
+  <text x="200" y="200" text-anchor="middle" font-size="80"><</text>
+  <text x="200" y="320" text-anchor="middle" font-family="Arial" font-size="32" fill="#e8d48b" font-weight="bold">#E CD+HE</text>
+  <text x="200" y="360" text-anchor="middle" font-family="Arial" font-size="18" fill="#8b7319">Umm Kulthum</text>
+  <text x="200" y="400" text-anchor="middle" font-family="Arial" font-size="14" fill="#c9b86a">CHC( 'D41B</text>
+  <text x="200" y="440" text-anchor="middle" font-family="Arial" font-size="12" fill="#5c4108">1898 - 1975</text>
+  <text x="200" y="480" text-anchor="middle" font-family="Arial" font-size="16" fill="#c9a227">  </text>
+</svg>

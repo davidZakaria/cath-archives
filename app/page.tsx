@@ -1,150 +1,381 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import UploadZone from '@/components/UploadZone';
 import CollectionUpload from '@/components/CollectionUpload';
+import StarsCarousel from '@/components/StarsCarousel';
 import Link from 'next/link';
+
+// Classic Egyptian Cinema Stars for decoration
+const GOLDEN_ERA_STARS = [
+  'فاتن حمامة', 'عمر الشريف', 'سعاد حسني', 'رشدي أباظة',
+  'شادية', 'عبد الحليم حافظ', 'فريد الأطرش', 'ليلى مراد',
+  'أنور وجدي', 'ماجدة', 'هند رستم', 'محمود المليجي'
+];
+
+const CLASSIC_MOVIES = [
+  'باب الحديد ١٩٥٨', 'الأرض ١٩٧٠', 'المومياء ١٩٦٩', 'شباب امرأة ١٩٥٦',
+  'دعاء الكروان ١٩٥٩', 'الناصر صلاح الدين ١٩٦٣', 'غزل البنات ١٩٤٩'
+];
 
 export default function HomePage() {
   const [uploadMode, setUploadMode] = useState<'single' | 'collection'>('collection');
+  const [currentStarIndex, setCurrentStarIndex] = useState(0);
+
+  // Rotate through stars
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentStarIndex((prev) => (prev + 1) % GOLDEN_ERA_STARS.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100" dir="rtl">
-      <div className="container mx-auto px-4 py-12">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-amber-900 mb-4">
-            أرشيف السينما العربية الرقمي
-          </h1>
-          <p className="text-lg text-amber-700 mb-6">
-            نظام رقمنة ومراجعة المجلات والصحف السينمائية التاريخية
-          </p>
-          <div className="flex justify-center gap-4 flex-wrap">
-            <Link
-              href="/archive"
-              className="px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition"
-            >
-              تصفح الأرشيف
-            </Link>
-            <Link
-              href="/review"
-              className="px-6 py-3 bg-white hover:bg-gray-50 text-amber-900 rounded-lg font-medium border-2 border-amber-300 transition"
-            >
-              قائمة المراجعة
-            </Link>
-            <Link
-              href="/dashboard"
-              className="px-6 py-3 bg-white hover:bg-gray-50 text-amber-900 rounded-lg font-medium border-2 border-amber-300 transition"
-            >
-              لوحة التحكم
-            </Link>
-          </div>
-        </div>
+    <div className="min-h-screen bg-[#0f0c08] relative overflow-hidden film-grain">
+      {/* Egyptian Pattern Background */}
+      <div className="fixed inset-0 egyptian-pattern opacity-30 pointer-events-none" />
+      
+      {/* Spotlight Effect */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[200%] h-[700px] pointer-events-none"
+        style={{
+          background: 'radial-gradient(ellipse at center top, rgba(201, 162, 39, 0.15) 0%, rgba(107, 28, 35, 0.05) 40%, transparent 70%)',
+        }}
+      />
 
-        {/* Upload Mode Tabs */}
-        <div className="max-w-4xl mx-auto mb-8">
-          <div className="flex justify-center">
-            <div className="inline-flex bg-white rounded-xl p-1 shadow-md">
-              <button
-                onClick={() => setUploadMode('collection')}
-                className={`px-6 py-3 rounded-lg font-medium transition-all ${
-                  uploadMode === 'collection'
-                    ? 'bg-amber-600 text-white shadow-md'
-                    : 'text-gray-600 hover:text-amber-700'
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                  رفع مجموعة (مقال كامل)
+      {/* Cinema Curtains */}
+      <div className="fixed top-0 left-0 w-40 h-full pointer-events-none"
+        style={{
+          background: 'linear-gradient(90deg, rgba(107, 28, 35, 0.6) 0%, rgba(74, 18, 24, 0.3) 50%, transparent 100%)',
+        }}
+      />
+      <div className="fixed top-0 right-0 w-40 h-full pointer-events-none"
+        style={{
+          background: 'linear-gradient(270deg, rgba(107, 28, 35, 0.6) 0%, rgba(74, 18, 24, 0.3) 50%, transparent 100%)',
+        }}
+      />
+
+      {/* Film Sprocket Left */}
+      <div className="fixed top-0 left-0 w-6 h-full bg-[#1a1612] film-sprockets pointer-events-none" />
+      <div className="fixed top-0 right-0 w-6 h-full bg-[#1a1612] film-sprockets pointer-events-none" />
+
+      <div className="relative z-10">
+        {/* Rotana-Style Header */}
+        <header className="rotana-header py-4 px-6">
+          <div className="container mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {/* Logo */}
+              <div className="relative">
+                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#c9a227] via-[#e8d48b] to-[#8b7319] p-0.5">
+                  <div className="w-full h-full rounded-full bg-[#1a1612] flex items-center justify-center">
+                    <span className="text-3xl">🎬</span>
+                  </div>
+                </div>
+                {/* Film reel decoration */}
+                <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#c9a227] opacity-60" />
+              </div>
+              <div>
+                <h2 className="text-[#c9a227] font-bold text-xl arabic-title">سينما زمان</h2>
+                <p className="text-[#8b7319] text-xs tracking-wider">CINEMA ZAMAN</p>
+              </div>
+            </div>
+            
+            {/* Navigation */}
+            <nav className="flex items-center gap-3">
+              <Link href="/archive" className="btn-outline-gold px-4 py-2 rounded-lg text-sm font-medium">
+                الأرشيف
+              </Link>
+              <Link href="/review" className="btn-outline-gold px-4 py-2 rounded-lg text-sm font-medium">
+                المراجعة
+              </Link>
+              <Link href="/movies" className="btn-outline-gold px-4 py-2 rounded-lg text-sm font-medium">
+                الأفلام
+              </Link>
+              <Link href="/dashboard" className="btn-rotana px-5 py-2 rounded-lg text-sm font-bold">
+                لوحة التحكم
+              </Link>
+            </nav>
+          </div>
+        </header>
+
+        {/* Hero Section */}
+        <section className="py-20 px-6 relative spotlight">
+          <div className="container mx-auto text-center relative">
+            {/* Decorative Egyptian Elements */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 text-[#c9a22730] text-sm tracking-[0.5em] hieroglyph-border">
+              𓂀 𓃭 𓆣 𓇋 𓈖 𓊪 𓋴 𓌳
+            </div>
+            
+            {/* Stars decoration */}
+            <div className="flex justify-center gap-3 mb-8">
+              {[...Array(7)].map((_, i) => (
+                <span key={i} className={`text-[#c9a227] ${i === 3 ? 'text-3xl' : 'text-xl'} star-rating`}>
+                  {i === 3 ? '✦' : '★'}
                 </span>
-              </button>
-              <button
-                onClick={() => setUploadMode('single')}
-                className={`px-6 py-3 rounded-lg font-medium transition-all ${
-                  uploadMode === 'single'
-                    ? 'bg-amber-600 text-white shadow-md'
-                    : 'text-gray-600 hover:text-amber-700'
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  رفع صور منفردة
-                </span>
-              </button>
+              ))}
+            </div>
+            
+            <h1 className="text-6xl md:text-8xl font-bold film-title arabic-title mb-4 cinema-flicker" dir="rtl">
+              أرشيف السينما
+            </h1>
+            <h2 className="text-3xl md:text-4xl text-[#e8d48b] font-bold arabic-title mb-2">
+              العصر الذهبي
+            </h2>
+            <p className="text-[#8b7319] text-lg mb-8 tracking-widest">
+              THE GOLDEN ERA OF EGYPTIAN CINEMA
+            </p>
+            
+            {/* Art Deco Divider */}
+            <div className="art-deco-divider max-w-xl mx-auto mb-8">
+              <span className="text-[#c9a227] text-2xl">❖</span>
+            </div>
+            
+            <p className="text-xl text-[#d4c4a0] max-w-3xl mx-auto mb-6 leading-relaxed arabic-body" dir="rtl">
+              رقمنة وحفظ التراث السينمائي المصري والعربي
+              <br />
+              من المجلات والصحف التاريخية في الفترة من ١٩٣٠ إلى ١٩٨٠
+            </p>
+            
+            {/* Rotating Star Names */}
+            <div className="h-8 mb-10 overflow-hidden">
+              <p className="text-[#c9a227] text-lg animate-pulse">
+                ✨ {GOLDEN_ERA_STARS[currentStarIndex]} ✨
+              </p>
+            </div>
+
+            {/* CTA Buttons */}
+            <div className="flex justify-center gap-4 flex-wrap">
+              <Link href="/archive" className="btn-rotana px-10 py-4 rounded-xl text-lg font-bold flex items-center gap-3 group">
+                <span className="text-2xl group-hover:animate-pulse">🎞️</span>
+                تصفح الأرشيف
+              </Link>
+              <Link href="/review" className="btn-burgundy px-10 py-4 rounded-xl text-lg font-bold flex items-center gap-3">
+                <span className="text-2xl">✍️</span>
+                قائمة المراجعة
+              </Link>
             </div>
           </div>
-          
-          <p className="text-center text-amber-700 mt-4 text-sm">
-            {uploadMode === 'collection' 
-              ? '💡 ارفع جميع صفحات المقال معاً ليتم معالجتها وعرضها كمجموعة واحدة'
-              : '💡 ارفع صور منفردة كل صورة تُعالج على حدة'
-            }
-          </p>
+        </section>
+
+        {/* Classic Movies Marquee */}
+        <div className="py-4 bg-gradient-to-r from-[#6b1c23] via-[#4a1218] to-[#6b1c23] border-y border-[#c9a227]/30 overflow-hidden">
+          <div className="flex animate-marquee whitespace-nowrap">
+            {[...CLASSIC_MOVIES, ...CLASSIC_MOVIES].map((movie, i) => (
+              <span key={i} className="mx-8 text-[#e8d48b] text-sm">
+                ★ {movie}
+              </span>
+            ))}
+          </div>
         </div>
 
         {/* Upload Section */}
-        <div className="mb-12">
-          {uploadMode === 'collection' ? (
-            <CollectionUpload />
-          ) : (
-            <UploadZone />
-          )}
-        </div>
+        <section className="py-16 px-6 relative">
+          {/* Lotus pattern decoration */}
+          <div className="absolute top-0 left-0 right-0 h-20 lotus-pattern opacity-30" />
+          
+          <div className="container mx-auto max-w-4xl">
+            {/* Section Header */}
+            <div className="text-center mb-10">
+              <div className="inline-flex items-center gap-4 mb-4">
+                <span className="text-[#c9a227] text-2xl">𓃭</span>
+                <h3 className="text-3xl font-bold text-[#c9a227] arabic-title">رفع الوثائق</h3>
+                <span className="text-[#c9a227] text-2xl">𓃭</span>
+              </div>
+              <p className="text-[#9c8550]">احفظ التراث السينمائي للأجيال القادمة</p>
+            </div>
 
-        {/* Info Cards */}
-        <div className="grid md:grid-cols-4 gap-6 max-w-5xl mx-auto">
-          <div className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow">
-            <div className="text-3xl mb-3">📤</div>
-            <h3 className="font-semibold text-lg mb-2 text-gray-900">1. الرفع</h3>
-            <p className="text-sm text-gray-600">
-              ارفع صفحات المجلات والصحف السينمائية
+            {/* Upload Mode Tabs */}
+            <div className="flex justify-center mb-8">
+              <div className="vintage-card inline-flex p-1.5 rounded-xl">
+                <button
+                  onClick={() => setUploadMode('collection')}
+                  className={`px-8 py-3 rounded-lg font-bold transition-all flex items-center gap-3 ${
+                    uploadMode === 'collection'
+                      ? 'bg-gradient-to-b from-[#c9a227] to-[#8b7319] text-[#1a1612]'
+                      : 'text-[#9c8550] hover:text-[#c9a227]'
+                  }`}
+                >
+                  <span className="text-xl">📚</span>
+                  رفع مجموعة
+                </button>
+                <button
+                  onClick={() => setUploadMode('single')}
+                  className={`px-8 py-3 rounded-lg font-bold transition-all flex items-center gap-3 ${
+                    uploadMode === 'single'
+                      ? 'bg-gradient-to-b from-[#c9a227] to-[#8b7319] text-[#1a1612]'
+                      : 'text-[#9c8550] hover:text-[#c9a227]'
+                  }`}
+                >
+                  <span className="text-xl">🖼️</span>
+                  صور منفردة
+                </button>
+              </div>
+            </div>
+
+            <p className="text-center text-[#7a6540] mb-8 text-sm">
+              {uploadMode === 'collection' 
+                ? '💡 ارفع جميع صفحات المقال معاً ليتم معالجتها كمجموعة واحدة'
+                : '💡 ارفع صور منفردة - كل صورة تُعالج على حدة'
+              }
             </p>
+
+            {/* Upload Component */}
+            <div className="vintage-card p-8 rounded-2xl corner-ornament">
+              {uploadMode === 'collection' ? (
+                <CollectionUpload />
+              ) : (
+                <UploadZone />
+              )}
+            </div>
           </div>
-          <div className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow">
-            <div className="text-3xl mb-3">🤖</div>
-            <h3 className="font-semibold text-lg mb-2 text-gray-900">2. OCR</h3>
-            <p className="text-sm text-gray-600">
-              استخراج النص تلقائياً باستخدام Google Vision
-            </p>
+        </section>
+
+        {/* How It Works */}
+        <section className="py-16 px-6 bg-gradient-to-b from-transparent via-[#1a1612]/50 to-transparent">
+          <div className="container mx-auto max-w-6xl">
+            <div className="text-center mb-12">
+              <div className="flex justify-center items-center gap-4 mb-4">
+                <div className="h-px w-16 bg-gradient-to-r from-transparent to-[#c9a227]" />
+                <span className="text-[#c9a227] text-3xl">𓂀</span>
+                <div className="h-px w-16 bg-gradient-to-l from-transparent to-[#c9a227]" />
+              </div>
+              <h3 className="text-3xl font-bold text-[#c9a227] arabic-title mb-2">كيف يعمل النظام</h3>
+              <p className="text-[#8b7319] tracking-wider">THE DIGITIZATION PROCESS</p>
+            </div>
+
+            <div className="grid md:grid-cols-4 gap-6">
+              {[
+                { 
+                  icon: '📜', 
+                  title: 'الرفع', 
+                  desc: 'ارفع صفحات المجلات والصحف السينمائية من العصر الذهبي',
+                  step: '𓏺'
+                },
+                { 
+                  icon: '🔍', 
+                  title: 'استخراج النص', 
+                  desc: 'تقنية OCR متقدمة للتعرف على النص العربي القديم بدقة عالية',
+                  step: '𓏻'
+                },
+                { 
+                  icon: '🤖', 
+                  title: 'الذكاء الاصطناعي', 
+                  desc: 'تصحيح تلقائي للأخطاء مع مراجعة كل تعديل قبل التطبيق',
+                  step: '𓏼'
+                },
+                { 
+                  icon: '✨', 
+                  title: 'الأرشفة', 
+                  desc: 'حفظ المحتوى بشكل دائم مع ربطه بالأفلام والنجوم',
+                  step: '𓏽'
+                },
+              ].map((item, index) => (
+                <div key={index} className="vintage-card p-6 rounded-xl text-center group hover:scale-105 transition-transform">
+                  <div className="relative inline-block mb-4">
+                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#2a2318] to-[#1a1510] flex items-center justify-center text-4xl border-2 border-[#5c4108] group-hover:border-[#c9a227] transition-colors">
+                      {item.icon}
+                    </div>
+                    <span className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-[#c9a227] to-[#8b7319] rounded-full flex items-center justify-center text-sm font-bold text-[#1a1612]">
+                      {item.step}
+                    </span>
+                  </div>
+                  <h4 className="text-xl font-bold text-[#c9a227] mb-2 arabic-title">{item.title}</h4>
+                  <p className="text-sm text-[#9c8550] leading-relaxed arabic-body">{item.desc}</p>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow">
-            <div className="text-3xl mb-3">🧠</div>
-            <h3 className="font-semibold text-lg mb-2 text-gray-900">3. الذكاء الاصطناعي</h3>
-            <p className="text-sm text-gray-600">
-              تصحيح وتنسيق النص باستخدام GPT-4
-            </p>
+        </section>
+
+        {/* Stars Carousel Section */}
+        <section className="py-16 px-6">
+          <div className="container mx-auto max-w-5xl">
+            <StarsCarousel 
+              autoPlay={true}
+              autoPlayInterval={5000}
+              showNavigation={true}
+              showDots={true}
+            />
+            
+            {/* View All Stars Link */}
+            <div className="text-center mt-8">
+              <Link href="/characters" className="btn-outline-gold px-8 py-3 rounded-xl text-sm inline-flex items-center gap-2">
+                <span>⭐</span>
+                تصفح جميع النجوم
+              </Link>
+            </div>
           </div>
-          <div className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow">
-            <div className="text-3xl mb-3">✍️</div>
-            <h3 className="font-semibold text-lg mb-2 text-gray-900">4. المراجعة</h3>
-            <p className="text-sm text-gray-600">
-              مراجعة يدوية لضمان الدقة 100%
-            </p>
-          </div>
-        </div>
+        </section>
 
         {/* Quick Links */}
-        <div className="mt-12 text-center">
-          <h2 className="text-xl font-semibold text-amber-900 mb-4">روابط سريعة</h2>
-          <div className="flex justify-center gap-4 flex-wrap">
-            <Link href="/movies" className="text-amber-600 hover:text-amber-800 hover:underline">
-              الأفلام
-            </Link>
-            <span className="text-gray-300">|</span>
-            <Link href="/characters" className="text-amber-600 hover:text-amber-800 hover:underline">
-              الشخصيات
-            </Link>
-            <span className="text-gray-300">|</span>
-            <Link href="/admin/categories" className="text-amber-600 hover:text-amber-800 hover:underline">
-              إدارة التصنيفات
-            </Link>
+        <section className="py-12 px-6 border-t border-[#3a3020]">
+          <div className="container mx-auto text-center">
+            <div className="flex justify-center items-center gap-8 flex-wrap text-sm">
+              <Link href="/movies" className="text-[#c9a227] hover:text-[#e8d48b] transition-colors flex items-center gap-2">
+                <span>🎬</span> الأفلام
+              </Link>
+              <span className="text-[#5c4108]">❖</span>
+              <Link href="/characters" className="text-[#c9a227] hover:text-[#e8d48b] transition-colors flex items-center gap-2">
+                <span>⭐</span> النجوم
+              </Link>
+              <span className="text-[#5c4108]">❖</span>
+              <Link href="/archive" className="text-[#c9a227] hover:text-[#e8d48b] transition-colors flex items-center gap-2">
+                <span>📚</span> الأرشيف
+              </Link>
+              <span className="text-[#5c4108]">❖</span>
+              <Link href="/admin/categories" className="text-[#c9a227] hover:text-[#e8d48b] transition-colors flex items-center gap-2">
+                <span>⚙️</span> الإدارة
+              </Link>
+            </div>
           </div>
-        </div>
+        </section>
+
+        {/* Footer */}
+        <footer className="py-12 px-6 bg-gradient-to-b from-[#1a1612] to-[#0f0c08] border-t border-[#c9a227]/20">
+          <div className="container mx-auto text-center">
+            {/* Hieroglyphic decoration */}
+            <div className="text-[#c9a22730] text-xs tracking-[0.3em] mb-6">
+              𓂀 𓃭 𓆣 𓇋 𓈖 𓊪 𓋴 𓌳 𓏏 𓐍 𓊹 𓅓
+            </div>
+            
+            <div className="flex justify-center gap-3 mb-6">
+              {[...Array(5)].map((_, i) => (
+                <span key={i} className="text-[#8b7319]">★</span>
+              ))}
+            </div>
+            
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#c9a227] to-[#8b7319] p-0.5">
+                <div className="w-full h-full rounded-full bg-[#0f0c08] flex items-center justify-center">
+                  <span className="text-xl">🎬</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-[#c9a227] font-bold text-lg arabic-title">سينما زمان</p>
+                <p className="text-[#8b7319] text-xs">أرشيف السينما المصرية</p>
+              </div>
+            </div>
+            
+            <p className="text-[#7a6540] text-sm mb-4">
+              حفظ التراث السينمائي العربي للأجيال القادمة
+            </p>
+            
+            <p className="text-[#5c4108] text-xs">
+              © {new Date().getFullYear()} جميع الحقوق محفوظة
+            </p>
+          </div>
+        </footer>
       </div>
+
+      {/* Marquee Animation */}
+      <style jsx>{`
+        @keyframes marquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-marquee {
+          animation: marquee 30s linear infinite;
+        }
+      `}</style>
     </div>
   );
 }

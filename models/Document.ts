@@ -1,6 +1,6 @@
 // Mongoose Document model
 import mongoose, { Schema, Model } from 'mongoose';
-import { IDocument, OCRBlock, ImageMetadata } from '@/types';
+import { IDocument, OCRBlock, ImageMetadata, AICorrection, FormattingChange } from '@/types';
 
 const OCRBlockSchema = new Schema<OCRBlock>({
   text: { type: String, required: true },
@@ -20,6 +20,50 @@ const ImageMetadataSchema = new Schema<ImageMetadata>({
   format: { type: String, required: true },
 });
 
+// Schema for AI-detected corrections (for one-by-one review)
+const AICorrectionSchema = new Schema<AICorrection>({
+  id: { type: String, required: true },
+  type: {
+    type: String,
+    enum: ['ocr_error', 'spelling', 'formatting'],
+    required: true,
+  },
+  original: { type: String, required: true },
+  corrected: { type: String, required: true },
+  reason: { type: String, required: true },
+  position: {
+    start: { type: Number, required: true },
+    end: { type: Number, required: true },
+  },
+  confidence: { type: Number, required: true },
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending',
+  },
+});
+
+// Schema for formatting changes
+const FormattingChangeSchema = new Schema<FormattingChange>({
+  id: { type: String, required: true },
+  type: {
+    type: String,
+    enum: ['title', 'paragraph', 'quote', 'section_break'],
+    required: true,
+  },
+  text: { type: String, required: true },
+  position: {
+    start: { type: Number, required: true },
+    end: { type: Number, required: true },
+  },
+  suggestion: { type: String, required: true },
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending',
+  },
+});
+
 const DocumentSchema = new Schema<IDocument>(
   {
     filename: { type: String, required: true },
@@ -31,6 +75,7 @@ const DocumentSchema = new Schema<IDocument>(
     
     // Collection reference (for multi-page articles)
     collectionId: { type: String, index: true },
+    pageNumber: { type: Number },
     
     // OCR Results
     ocrText: { type: String, default: '' },
@@ -67,6 +112,14 @@ const DocumentSchema = new Schema<IDocument>(
       source: { type: String },
     },
     
+    // AI Detected Corrections (for one-by-one review workflow)
+    pendingCorrections: [AICorrectionSchema],
+    pendingFormattingChanges: [FormattingChangeSchema],
+    aiDetectionConfidence: { type: Number },
+    aiDetectionCost: { type: Number },
+    aiDetectionModelUsed: { type: String },
+    aiDetectedAt: { type: Date },
+    
     // Related entities (references to Movie/Character collections)
     relatedMovies: [{ type: Schema.Types.ObjectId, ref: 'Movie' }],
     relatedCharacters: [{ type: Schema.Types.ObjectId, ref: 'Character' }],
@@ -85,6 +138,8 @@ const DocumentSchema = new Schema<IDocument>(
     reviewCompletedAt: { type: Date },
     reviewTimeSeconds: { type: Number },
     correctionsCount: { type: Number, default: 0 },
+    approvedCorrectionsCount: { type: Number, default: 0 },
+    rejectedCorrectionsCount: { type: Number, default: 0 },
     reviewNotes: { type: String },
     
     uploadedAt: { type: Date, default: Date.now },

@@ -1,6 +1,6 @@
 // AI Agent for text correction, formatting, and metadata extraction using GPT-4
 import OpenAI from 'openai';
-import { FormattedArticle, ArticleMetadata, Dialogue } from '@/types';
+import { FormattedArticle, ArticleMetadata, Dialogue, AICorrection, CorrectionType, FormattingChange } from '@/types';
 
 // Model options for different cost/accuracy trade-offs
 export type AIModel = 'gpt-4o-mini' | 'gpt-4o' | 'gpt-4-turbo-preview';
@@ -507,4 +507,203 @@ Return JSON:
     console.error('Historical verification failed:', error);
     throw new Error(`Historical verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
+}
+
+// System prompt for focused text correction detection (OCR errors, spelling, formatting only)
+const DETECTION_SYSTEM_PROMPT = `You are an expert Arabic OCR text analyst. Your ONLY task is to detect and list corrections needed in the text.
+
+You MUST focus ONLY on these three types of errors:
+
+1. OCR CHARACTER ERRORS (type: "ocr_error"):
+   - ة/ه confusion (taa marbuta vs haa)
+   - ء/ئ/ؤ confusion (hamza placement)
+   - ى/ي confusion (alef maqsura vs yaa)
+   - ا/أ/إ/آ confusion (alef variations)
+   - Word boundary/spacing issues
+   - Merged or split words from OCR
+
+2. SPELLING MISTAKES (type: "spelling"):
+   - Misspelled Arabic words
+   - Missing or extra letters
+   - Common Arabic spelling errors
+
+3. FORMATTING ISSUES (type: "formatting"):
+   - Title detection (should be marked as title)
+   - Paragraph separation
+   - Quote/dialogue detection (text in quotes)
+   - Section breaks
+
+DO NOT correct:
+- Grammar issues
+- Historical accuracy
+- Names or dates (even if they seem wrong)
+- Style or word choice
+
+For each correction, provide:
+- The exact original text
+- The corrected version
+- A clear reason
+- The character position (start/end) in the original text
+- A confidence score (0.0-1.0) - only include corrections with confidence >= 0.95
+
+Output ONLY valid JSON with no additional text.`;
+
+// Detection result interface
+export interface TextCorrectionDetectionResult {
+  corrections: AICorrection[];
+  formattingChanges: FormattingChange[];
+  correctedText: string;
+  totalCorrections: number;
+  confidence: number;
+  cost: number;
+  modelUsed: AIModel;
+}
+
+// New focused function: Detect text corrections only (OCR errors, spelling, formatting)
+// Uses gpt-4o for 99% accuracy target with low temperature
+export async function detectTextCorrections(
+  ocrText: string,
+  options: { model?: AIModel; confidenceThreshold?: number } = {}
+): Promise<TextCorrectionDetectionResult> {
+  const client = getOpenAIClient();
+  // Use gpt-4o by default for higher accuracy (99% target)
+  const model = options.model || 'gpt-4o';
+  const confidenceThreshold = options.confidenceThreshold ?? 0.95;
+  const modelConfig = AI_MODELS[model];
+  
+  try {
+    const response = await client.chat.completions.create({
+      model: model,
+      messages: [
+        {
+          role: 'system',
+          content: DETECTION_SYSTEM_PROMPT,
+        },
+        {
+          role: 'user',
+          content: `Analyze this Arabic OCR text and detect all corrections needed.
+
+Return JSON with this exact structure:
+{
+  "corrections": [
+    {
+      "id": "unique_id_1",
+      "type": "ocr_error" | "spelling" | "formatting",
+      "original": "the exact original text with error",
+      "corrected": "the corrected text",
+      "reason": "brief explanation in English",
+      "position": { "start": 0, "end": 10 },
+      "confidence": 0.95 to 1.0
+    }
+  ],
+  "formattingChanges": [
+    {
+      "id": "fmt_1",
+      "type": "title" | "paragraph" | "quote" | "section_break",
+      "text": "the text to format",
+      "position": { "start": 0, "end": 50 },
+      "suggestion": "Mark as title" | "New paragraph" | "Format as quote"
+    }
+  ],
+  "correctedText": "the full text with all corrections applied",
+  "confidence": 0.0 to 1.0 overall confidence
+}
+
+OCR Text to analyze:
+${ocrText}`,
+        },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.1, // Very low temperature for consistent, accurate results
+      max_tokens: 8000,
+    });
+
+    const inputTokens = response.usage?.prompt_tokens || 0;
+    const outputTokens = response.usage?.completion_tokens || 0;
+    const cost = 
+      (inputTokens / 1000000) * modelConfig.inputCostPer1M +
+      (outputTokens / 1000000) * modelConfig.outputCostPer1M;
+
+    console.log(`[Text Correction Detection] Model: ${model}, Cost: $${cost.toFixed(6)}`);
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      return {
+        corrections: [],
+        formattingChanges: [],
+        correctedText: ocrText,
+        totalCorrections: 0,
+        confidence: 0,
+        cost,
+        modelUsed: model,
+      };
+    }
+
+    const result = JSON.parse(content);
+    
+    // Filter corrections by confidence threshold and normalize
+    const corrections: AICorrection[] = (result.corrections || [])
+      .filter((c: { confidence?: number }) => (c.confidence || 0) >= confidenceThreshold)
+      .map((c: { id?: string; type?: string; original?: string; corrected?: string; reason?: string; position?: { start?: number; end?: number }; confidence?: number }, index: number) => ({
+        id: c.id || `correction_${index}`,
+        type: (c.type as CorrectionType) || 'ocr_error',
+        original: c.original || '',
+        corrected: c.corrected || '',
+        reason: c.reason || '',
+        position: {
+          start: c.position?.start || 0,
+          end: c.position?.end || 0,
+        },
+        confidence: c.confidence || 0.95,
+        status: 'pending' as const,
+      }));
+
+    // Normalize formatting changes
+    const formattingChanges: FormattingChange[] = (result.formattingChanges || [])
+      .map((f: { id?: string; type?: string; text?: string; position?: { start?: number; end?: number }; suggestion?: string }, index: number) => ({
+        id: f.id || `fmt_${index}`,
+        type: f.type || 'paragraph',
+        text: f.text || '',
+        position: {
+          start: f.position?.start || 0,
+          end: f.position?.end || 0,
+        },
+        suggestion: f.suggestion || '',
+        status: 'pending' as const,
+      }));
+
+    return {
+      corrections,
+      formattingChanges,
+      correctedText: result.correctedText || ocrText,
+      totalCorrections: corrections.length + formattingChanges.length,
+      confidence: result.confidence ?? 0.9,
+      cost,
+      modelUsed: model,
+    };
+  } catch (error) {
+    console.error('Text correction detection failed:', error);
+    throw new Error(`Text correction detection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+// Apply approved corrections to text
+export function applyApprovedCorrections(
+  originalText: string,
+  corrections: AICorrection[]
+): string {
+  // Sort corrections by position (end to start) to avoid position shifts
+  const approvedCorrections = corrections
+    .filter(c => c.status === 'approved')
+    .sort((a, b) => b.position.start - a.position.start);
+
+  let result = originalText;
+  
+  for (const correction of approvedCorrections) {
+    const before = result.slice(0, correction.position.start);
+    const after = result.slice(correction.position.end);
+    result = before + correction.corrected + after;
+  }
+  
+  return result;
 }

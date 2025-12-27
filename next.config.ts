@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
         protocol: 'http',
         hostname: 'localhost',
       },
+      {
+        protocol: 'https',
+        hostname: 'upload.wikimedia.org',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.wikipedia.org',
+      },
     ],
   },
   // Allow server-side API calls to work properly
