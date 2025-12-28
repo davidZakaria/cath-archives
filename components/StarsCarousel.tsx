@@ -148,8 +148,12 @@ function StarPortrait({
   size?: 'small' | 'large';
 }) {
   const [imageError, setImageError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
   const isLarge = size === 'large';
+  
+  // Reset error state when image changes
+  useEffect(() => {
+    setImageError(false);
+  }, [image]);
   
   const showImage = image && !imageError;
   
@@ -162,30 +166,20 @@ function StarPortrait({
         background: `linear-gradient(145deg, ${color}15 0%, ${color}30 50%, ${color}15 100%)`,
       }}
     >
-      {/* Image */}
+      {/* Image - show immediately, SVGs load instantly */}
       {showImage && (
-        <>
-          {/* Loading placeholder */}
-          {!imageLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center bg-[#1a1612]">
-              <div className="w-8 h-8 border-2 border-[#c9a227] border-t-transparent rounded-full animate-spin" />
-            </div>
-          )}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={image}
-            alt={name}
-            className={`absolute inset-0 w-full h-full transition-opacity duration-500 ${
-              imageLoaded ? 'opacity-100' : 'opacity-0'
-            }`}
-            style={{ 
-              objectFit: 'cover',
-              objectPosition: 'center top',
-            }}
-            onLoad={() => setImageLoaded(true)}
-            onError={() => setImageError(true)}
-          />
-        </>
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          key={image}
+          src={image}
+          alt={name}
+          className="absolute inset-0 w-full h-full"
+          style={{ 
+            objectFit: 'cover',
+            objectPosition: 'center top',
+          }}
+          onError={() => setImageError(true)}
+        />
       )}
       
       
@@ -201,7 +195,7 @@ function StarPortrait({
       <div className="absolute inset-0 shadow-[inset_0_0_50px_rgba(0,0,0,0.5)] pointer-events-none" />
       
       {/* Bottom gradient for name (when image is shown) */}
-      {showImage && imageLoaded && isLarge && (
+      {showImage && isLarge && (
         <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/70 to-transparent pointer-events-none" />
       )}
     </div>

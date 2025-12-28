@@ -74,6 +74,30 @@ export interface ICollection {
     detectedTitles: string[];
   };
   
+  // AI Detected Corrections (for one-by-one review)
+  pendingCorrections?: Array<{
+    id: string;
+    type: 'ocr_error' | 'spelling' | 'formatting';
+    original: string;
+    corrected: string;
+    reason: string;
+    position: { start: number; end: number };
+    confidence: number;
+    status: 'pending' | 'approved' | 'rejected';
+  }>;
+  pendingFormattingChanges?: Array<{
+    id: string;
+    type: 'title' | 'paragraph' | 'quote' | 'section_break';
+    text: string;
+    position: { start: number; end: number };
+    suggestion: string;
+    status: 'pending' | 'approved' | 'rejected';
+  }>;
+  aiDetectionConfidence?: number;
+  aiDetectionCost?: number;
+  aiDetectionModelUsed?: string;
+  aiDetectedAt?: Date;
+  
   // Timestamps
   createdAt: Date;
   updatedAt: Date;
@@ -159,6 +183,36 @@ const CollectionSchema = new Schema<ICollection>(
       averageFontSize: { type: Number },
       detectedTitles: [{ type: String }],
     },
+    
+    // AI Detected Corrections
+    pendingCorrections: [{
+      id: { type: String },
+      type: { type: String, enum: ['ocr_error', 'spelling', 'formatting'] },
+      original: { type: String },
+      corrected: { type: String },
+      reason: { type: String },
+      position: {
+        start: { type: Number },
+        end: { type: Number },
+      },
+      confidence: { type: Number },
+      status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+    }],
+    pendingFormattingChanges: [{
+      id: { type: String },
+      type: { type: String, enum: ['title', 'paragraph', 'quote', 'section_break'] },
+      text: { type: String },
+      position: {
+        start: { type: Number },
+        end: { type: Number },
+      },
+      suggestion: { type: String },
+      status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+    }],
+    aiDetectionConfidence: { type: Number },
+    aiDetectionCost: { type: Number },
+    aiDetectionModelUsed: { type: String },
+    aiDetectedAt: { type: Date },
   },
   {
     timestamps: true,

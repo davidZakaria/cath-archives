@@ -509,42 +509,55 @@ Return JSON:
   }
 }
 
-// System prompt for focused text correction detection (OCR errors, spelling, formatting only)
-const DETECTION_SYSTEM_PROMPT = `You are an expert Arabic OCR text analyst. Your ONLY task is to detect and list corrections needed in the text.
+// System prompt for focused text correction detection (nonsense words only)
+const DETECTION_SYSTEM_PROMPT = `You are an expert Arabic linguist specializing in Classical Arabic (اللغة العربية الفصحى) and historical texts.
 
-You MUST focus ONLY on these three types of errors:
+IMPORTANT CONTEXT:
+- This text is from HISTORICAL Arabic documents (old newspapers, magazines, literature)
+- The language is Classical/Formal Arabic (الفصحى), NOT modern colloquial
+- Old/archaic vocabulary is VALID and should NOT be corrected
+- Literary and poetic expressions are VALID
+- Historical spelling conventions are VALID
 
-1. OCR CHARACTER ERRORS (type: "ocr_error"):
-   - ة/ه confusion (taa marbuta vs haa)
-   - ء/ئ/ؤ confusion (hamza placement)
-   - ى/ي confusion (alef maqsura vs yaa)
-   - ا/أ/إ/آ confusion (alef variations)
-   - Word boundary/spacing issues
-   - Merged or split words from OCR
+Your task is to:
+1. Find COMPLETELY GARBLED/CORRUPTED words from OCR errors
+2. SUGGEST the correct word based on context
+3. Flag EMAIL ADDRESSES and WEBSITES for removal
 
-2. SPELLING MISTAKES (type: "spelling"):
-   - Misspelled Arabic words
-   - Missing or extra letters
-   - Common Arabic spelling errors
+You MUST focus on:
 
-3. FORMATTING ISSUES (type: "formatting"):
-   - Title detection (should be marked as title)
-   - Paragraph separation
-   - Quote/dialogue detection (text in quotes)
-   - Section breaks
+1. OCR GARBAGE (type: "ocr_error"):
+   - Random letter combinations that form NO Arabic word
+   - Severely corrupted text from bad scanning
+   - Words where letters are scrambled or missing
 
-DO NOT correct:
-- Grammar issues
-- Historical accuracy
-- Names or dates (even if they seem wrong)
-- Style or word choice
+2. EMAILS & WEBSITES TO REMOVE (type: "ocr_error"):
+   - Any email address (e.g., name@domain.com)
+   - Any website URL (e.g., www.example.com, http://...)
+   - These should be REMOVED (corrected = empty string "")
 
-For each correction, provide:
-- The exact original text
-- The corrected version
-- A clear reason
-- The character position (start/end) in the original text
-- A confidence score (0.0-1.0) - only include corrections with confidence >= 0.95
+FOR EACH ERROR YOU FIND:
+- "original": the corrupted word OR email/website to remove
+- "corrected": the CORRECT ARABIC WORD, or "" (empty) for emails/websites
+- For emails/websites: set corrected to "" to remove them
+- Use surrounding context to determine what corrupted words should be
+
+ABSOLUTELY DO NOT FLAG:
+- Classical Arabic vocabulary - even if archaic/old
+- Literary/poetic expressions
+- Historical names, places, titles
+- Arabic diacritics/tashkeel
+- Letter variations (ة/ه, ى/ي, أ/إ/آ/ا, ء/ئ/ؤ)
+- Old spelling conventions
+- Punctuation, numbers, dates
+- Any word that EXISTS in Arabic
+
+ONLY flag a word if:
+- It is COMPLETE OCR GARBAGE
+- You CAN determine what it SHOULD be from context
+- You are 99%+ confident
+
+Remember: Classical Arabic has rich vocabulary. When in doubt, DO NOT flag.
 
 Output ONLY valid JSON with no additional text.`;
 
@@ -568,7 +581,7 @@ export async function detectTextCorrections(
   const client = getOpenAIClient();
   // Use gpt-4o by default for higher accuracy (99% target)
   const model = options.model || 'gpt-4o';
-  const confidenceThreshold = options.confidenceThreshold ?? 0.95;
+  const confidenceThreshold = options.confidenceThreshold ?? 0.99; // Very high threshold - only flag obvious OCR garbage
   const modelConfig = AI_MODELS[model];
   
   try {
@@ -581,35 +594,56 @@ export async function detectTextCorrections(
         },
         {
           role: 'user',
-          content: `Analyze this Arabic OCR text and detect all corrections needed.
+          content: `This is HISTORICAL Arabic text (الفصحى - Classical Arabic). Find OCR garbage AND emails/websites to remove.
 
-Return JSON with this exact structure:
+IMPORTANT:
+- This is Classical/Formal Arabic from old documents
+- Old/archaic vocabulary is VALID - do not flag
+- Literary expressions are VALID - do not flag
+- ONLY flag words that are COMPLETE OCR GARBAGE
+- REMOVE all email addresses and website URLs
+
+FOR EACH ERROR:
+1. For OCR garbage: suggest the correct Arabic word
+2. For emails/websites: set corrected to "" (empty string) to REMOVE them
+
+Return JSON:
 {
   "corrections": [
     {
-      "id": "unique_id_1",
-      "type": "ocr_error" | "spelling" | "formatting",
-      "original": "the exact original text with error",
-      "corrected": "the corrected text",
-      "reason": "brief explanation in English",
+      "id": "1",
+      "type": "ocr_error",
+      "original": "المبلة",
+      "corrected": "الممثلة",
+      "reason": "OCR misread the actress name",
       "position": { "start": 0, "end": 10 },
-      "confidence": 0.95 to 1.0
-    }
-  ],
-  "formattingChanges": [
+      "confidence": 0.99
+    },
     {
-      "id": "fmt_1",
-      "type": "title" | "paragraph" | "quote" | "section_break",
-      "text": "the text to format",
-      "position": { "start": 0, "end": 50 },
-      "suggestion": "Mark as title" | "New paragraph" | "Format as quote"
+      "id": "2",
+      "type": "ocr_error",
+      "original": "example@email.com",
+      "corrected": "",
+      "reason": "Remove email address",
+      "position": { "start": 100, "end": 120 },
+      "confidence": 1.0
+    },
+    {
+      "id": "3",
+      "type": "ocr_error",
+      "original": "www.website.com",
+      "corrected": "",
+      "reason": "Remove website URL",
+      "position": { "start": 200, "end": 220 },
+      "confidence": 1.0
     }
   ],
-  "correctedText": "the full text with all corrections applied",
-  "confidence": 0.0 to 1.0 overall confidence
+  "formattingChanges": [],
+  "correctedText": "text with corrections and emails/websites removed",
+  "confidence": 0.0 to 1.0
 }
 
-OCR Text to analyze:
+Classical Arabic text to analyze:
 ${ocrText}`,
         },
       ],
@@ -639,11 +673,56 @@ ${ocrText}`,
       };
     }
 
-    const result = JSON.parse(content);
+    // Try to parse JSON, with fallback for truncated responses
+    let result;
+    try {
+      result = JSON.parse(content);
+    } catch (parseError) {
+      console.error('JSON parse error, attempting to fix truncated response:', parseError);
+      // Try to fix common JSON truncation issues
+      let fixedContent = content;
+      // Close any unclosed arrays and objects
+      const openBrackets = (fixedContent.match(/\[/g) || []).length;
+      const closeBrackets = (fixedContent.match(/\]/g) || []).length;
+      const openBraces = (fixedContent.match(/\{/g) || []).length;
+      const closeBraces = (fixedContent.match(/\}/g) || []).length;
+      
+      // Add missing closing brackets
+      for (let i = 0; i < openBrackets - closeBrackets; i++) {
+        fixedContent += ']';
+      }
+      for (let i = 0; i < openBraces - closeBraces; i++) {
+        fixedContent += '}';
+      }
+      
+      try {
+        result = JSON.parse(fixedContent);
+      } catch {
+        // If still fails, return empty result
+        console.error('Could not parse AI response even after fix attempt');
+        return {
+          corrections: [],
+          formattingChanges: [],
+          correctedText: ocrText,
+          totalCorrections: 0,
+          confidence: 0,
+          cost,
+          modelUsed: model,
+        };
+      }
+    }
     
     // Filter corrections by confidence threshold and normalize
+    // Also filter out corrections where original and corrected are the same
     const corrections: AICorrection[] = (result.corrections || [])
-      .filter((c: { confidence?: number }) => (c.confidence || 0) >= confidenceThreshold)
+      .filter((c: { confidence?: number; original?: string; corrected?: string }) => {
+        const meetsConfidence = (c.confidence || 0) >= confidenceThreshold;
+        // Allow empty corrected for removals (emails/websites), but original must exist
+        const hasOriginal = c.original && c.original.trim().length > 0;
+        const isRemoval = c.corrected === '' || c.corrected === undefined;
+        const hasActualChange = c.original?.trim() !== c.corrected?.trim();
+        return meetsConfidence && hasOriginal && (isRemoval || hasActualChange);
+      })
       .map((c: { id?: string; type?: string; original?: string; corrected?: string; reason?: string; position?: { start?: number; end?: number }; confidence?: number }, index: number) => ({
         id: c.id || `correction_${index}`,
         type: (c.type as CorrectionType) || 'ocr_error',

@@ -79,6 +79,7 @@ export default function RootLayout({
       <body
         className={`${amiri.variable} ${notoNaskhArabic.variable} antialiased`}
         style={{ fontFamily: "'Amiri', 'Noto Naskh Arabic', Georgia, serif" }}
+        suppressHydrationWarning
       >
         {children}
       </body>

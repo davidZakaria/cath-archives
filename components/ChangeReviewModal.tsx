@@ -58,16 +58,77 @@ export default function ChangeReviewModal({
     }
   }, [pendingChanges.length, currentIndex]);
 
-  // Get context around the change (surrounding text)
-  const getContextText = useCallback((position: { start: number; end: number }, contextSize: number = 50) => {
-    const start = Math.max(0, position.start - contextSize);
-    const end = Math.min(originalText.length, position.end + contextSize);
+  // Get full context around the change - finds the actual original word in text
+  const getContextText = useCallback((originalWord: string, position: { start: number; end: number }) => {
+    // First, try to find the actual original word in the text
+    // Search near the position first, then expand if not found
+    let actualStart = -1;
+    let actualEnd = -1;
     
-    const beforeChange = originalText.slice(start, position.start);
-    const changeText = originalText.slice(position.start, position.end);
-    const afterChange = originalText.slice(position.end, end);
+    // Search in a window around the position
+    const searchStart = Math.max(0, position.start - 500);
+    const searchEnd = Math.min(originalText.length, position.end + 500);
+    const searchArea = originalText.slice(searchStart, searchEnd);
     
-    return { beforeChange, changeText, afterChange, hasMore: start > 0 || end < originalText.length };
+    const wordIndex = searchArea.indexOf(originalWord);
+    if (wordIndex !== -1) {
+      actualStart = searchStart + wordIndex;
+      actualEnd = actualStart + originalWord.length;
+    } else {
+      // If not found near position, search entire text
+      const fullIndex = originalText.indexOf(originalWord);
+      if (fullIndex !== -1) {
+        actualStart = fullIndex;
+        actualEnd = actualStart + originalWord.length;
+      } else {
+        // Fallback to position-based if word not found
+        actualStart = position.start;
+        actualEnd = position.end;
+      }
+    }
+    
+    // Find paragraph boundaries around the actual position
+    let paragraphStart = actualStart;
+    let paragraphEnd = actualEnd;
+    
+    // Search backwards for paragraph start
+    for (let i = actualStart - 1; i >= 0; i--) {
+      if (originalText[i] === '\n' || originalText[i] === '\r') {
+        paragraphStart = i + 1;
+        break;
+      }
+      if (i === 0) paragraphStart = 0;
+    }
+    
+    // Search forwards for paragraph end
+    for (let i = actualEnd; i < originalText.length; i++) {
+      if (originalText[i] === '\n' || originalText[i] === '\r') {
+        paragraphEnd = i;
+        break;
+      }
+      if (i === originalText.length - 1) paragraphEnd = originalText.length;
+    }
+    
+    // Extend context if too short
+    const minContext = 200;
+    if (actualStart - paragraphStart < minContext) {
+      paragraphStart = Math.max(0, actualStart - minContext);
+    }
+    if (paragraphEnd - actualEnd < minContext) {
+      paragraphEnd = Math.min(originalText.length, actualEnd + minContext);
+    }
+    
+    const beforeChange = originalText.slice(paragraphStart, actualStart);
+    const changeText = originalText.slice(actualStart, actualEnd);
+    const afterChange = originalText.slice(actualEnd, paragraphEnd);
+    
+    return { 
+      beforeChange, 
+      changeText, 
+      afterChange, 
+      hasMoreBefore: paragraphStart > 0,
+      hasMoreAfter: paragraphEnd < originalText.length 
+    };
   }, [originalText]);
 
   const handleApprove = useCallback(() => {
@@ -173,7 +234,7 @@ export default function ChangeReviewModal({
     );
   }
 
-  const context = currentChange ? getContextText(currentChange.position) : null;
+  const context = currentChange ? getContextText(currentChange.original, currentChange.position) : null;
   const typeInfo = currentChange ? TYPE_LABELS[currentChange.type] || TYPE_LABELS.formatting : null;
 
   return (
@@ -229,30 +290,54 @@ export default function ChangeReviewModal({
               </span>
             </div>
 
-            {/* Context display */}
-            <div className="bg-[#2a2318] rounded-xl p-4 mb-4 font-arabic text-right border border-[#3a3020]" dir="rtl">
-              <div className="text-lg leading-relaxed text-[#d4c4a8]">
-                {context.hasMore && <span className="text-[#5c4108]">...</span>}
+            {/* Full context display - shows whole paragraph */}
+            <div className="bg-[#2a2318] rounded-xl p-4 mb-4 font-arabic text-right border-2 border-[#3a3020] max-h-[25vh] overflow-y-auto" dir="rtl">
+              <div className="text-xs text-[#7a6545] mb-2">📜 النص الكامل (الكلمة المحددة باللون الأحمر):</div>
+              <div 
+                className="leading-relaxed text-[#d4c4a8]"
+                style={{ 
+                  fontFamily: "'Amiri', 'Noto Naskh Arabic', Georgia, serif",
+                  fontSize: '18px',
+                  lineHeight: '2',
+                }}
+              >
+                {context.hasMoreBefore && <span className="text-[#5c4108] text-base">... </span>}
                 <span>{context.beforeChange}</span>
-                <span className="bg-[#4a2020] text-[#ff6b6b] px-1 rounded line-through mx-1">
+                <mark className="bg-[#8a2020] text-[#ffcccc] px-2 py-0.5 rounded mx-1 font-bold border-2 border-[#cc4444]">
                   {context.changeText}
-                </span>
+                </mark>
                 <span>{context.afterChange}</span>
-                {context.hasMore && <span className="text-[#5c4108]">...</span>}
+                {context.hasMoreAfter && <span className="text-[#5c4108] text-base"> ...</span>}
               </div>
             </div>
 
-            {/* Change details */}
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="bg-[#4a2020]/30 rounded-xl p-4 border border-[#6a3030]">
-                <div className="text-xs text-[#ff6b6b] font-medium mb-2">الأصلي</div>
-                <div className="font-arabic text-right text-lg text-[#ff6b6b]" dir="rtl">
+            {/* Change details - Original vs Suggested */}
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="bg-[#4a2020]/50 rounded-xl p-4 border-2 border-[#8a3030]">
+                <div className="text-xs text-[#ff9999] font-bold mb-2">❌ الأصلي (الخطأ)</div>
+                <div 
+                  className="font-arabic text-right text-[#ff8888]" 
+                  dir="rtl"
+                  style={{ 
+                    fontFamily: "'Amiri', 'Noto Naskh Arabic', Georgia, serif",
+                    fontSize: '22px',
+                    lineHeight: '1.8',
+                  }}
+                >
                   {currentChange.original}
                 </div>
               </div>
-              <div className="bg-[#2a4a2a]/30 rounded-xl p-4 border border-[#4a8a4a]">
-                <div className="text-xs text-[#90ee90] font-medium mb-2">المقترح</div>
-                <div className="font-arabic text-right text-lg text-[#90ee90]" dir="rtl">
+              <div className="bg-[#2a4a2a]/50 rounded-xl p-4 border-2 border-[#4a8a4a]">
+                <div className="text-xs text-[#99ff99] font-bold mb-2">✅ المقترح (الصحيح)</div>
+                <div 
+                  className="font-arabic text-right text-[#88ff88]" 
+                  dir="rtl"
+                  style={{ 
+                    fontFamily: "'Amiri', 'Noto Naskh Arabic', Georgia, serif",
+                    fontSize: '22px',
+                    lineHeight: '1.8',
+                  }}
+                >
                   {currentChange.changeType === 'correction' 
                     ? (currentChange as AICorrection).corrected 
                     : (currentChange as FormattingChange).suggestion}
@@ -261,9 +346,9 @@ export default function ChangeReviewModal({
             </div>
 
             {/* Reason */}
-            <div className="bg-[#2a3a4a]/30 rounded-xl p-4 border border-[#3a4a5a]">
-              <div className="text-xs text-[#60a5fa] font-medium mb-2">السبب</div>
-              <div className="text-[#60a5fa]">
+            <div className="bg-[#2a3a4a]/50 rounded-xl p-3 border border-[#3a4a5a]">
+              <div className="text-xs text-[#88bbff] font-bold mb-1">💡 السبب</div>
+              <div className="text-[#aaccff] text-sm">
                 {currentChange.changeType === 'correction' 
                   ? (currentChange as AICorrection).reason 
                   : (currentChange as FormattingChange).suggestion}

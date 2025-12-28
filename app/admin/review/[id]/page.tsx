@@ -4,6 +4,8 @@ import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
+import ChangeReviewModal from '@/components/ChangeReviewModal';
+import { AICorrection, FormattingChange, CorrectionStatus } from '@/types';
 
 interface Page {
   documentId: string;
@@ -61,6 +63,12 @@ export default function ReviewDetailPage({ params }: { params: Promise<{ id: str
   const [selectedPage, setSelectedPage] = useState(0);
   const [showAllPages, setShowAllPages] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  
+  // AI Correction states
+  const [runningAI, setRunningAI] = useState(false);
+  const [corrections, setCorrections] = useState<AICorrection[]>([]);
+  const [formattingChanges, setFormattingChanges] = useState<FormattingChange[]>([]);
+  const [showReviewModal, setShowReviewModal] = useState(false);
 
   useEffect(() => {
     fetchCollection();
@@ -177,6 +185,92 @@ export default function ReviewDetailPage({ params }: { params: Promise<{ id: str
     }
   };
 
+  // AI Correction Detection
+  const handleRunAI = async () => {
+    if (!collection || !editedText.trim()) {
+      setMessage({ type: 'error', text: 'لا يوجد نص للمراجعة' });
+      return;
+    }
+
+    setRunningAI(true);
+    setMessage(null);
+
+    try {
+      // Call the corrections API
+      const response = await fetch(`/api/corrections/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: editedText,
+          model: 'gpt-4o-mini',
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const totalChanges = (data.corrections?.length || 0) + (data.formattingChanges?.length || 0);
+        
+        if (totalChanges > 0) {
+          setCorrections(data.corrections || []);
+          setFormattingChanges(data.formattingChanges || []);
+          setShowReviewModal(true);
+          setMessage({ type: 'success', text: `تم اكتشاف ${totalChanges} تصحيح محتمل` });
+        } else {
+          setMessage({ type: 'success', text: 'لم يتم العثور على أخطاء - النص يبدو صحيحاً!' });
+        }
+      } else {
+        const errorData = await response.json();
+        setMessage({ type: 'error', text: errorData.error || 'فشل تشغيل الذكاء الاصطناعي' });
+      }
+    } catch (error) {
+      console.error('AI error:', error);
+      setMessage({ type: 'error', text: 'حدث خطأ أثناء تشغيل الذكاء الاصطناعي' });
+    } finally {
+      setRunningAI(false);
+    }
+  };
+
+  // Update individual correction status
+  const handleUpdateCorrection = (correctionId: string, status: CorrectionStatus) => {
+    setCorrections(prev => 
+      prev.map(c => c.id === correctionId ? { ...c, status } : c)
+    );
+  };
+
+  // Update individual formatting change status
+  const handleUpdateFormatting = (changeId: string, status: CorrectionStatus) => {
+    setFormattingChanges(prev => 
+      prev.map(f => f.id === changeId ? { ...f, status } : f)
+    );
+  };
+
+  // Apply approved corrections to the text
+  const handleApplyCorrections = () => {
+    let newText = editedText;
+    
+    // Combine all approved corrections
+    const approvedTextCorrections = corrections.filter(c => c.status === 'approved');
+    
+    // Sort corrections by position (reverse) to apply from end to start
+    // This prevents position shifts when replacing text
+    const sortedCorrections = [...approvedTextCorrections].sort((a, b) => {
+      const posA = a.position?.start || 0;
+      const posB = b.position?.start || 0;
+      return posB - posA;
+    });
+
+    for (const correction of sortedCorrections) {
+      // Replace the original text with the corrected text
+      newText = newText.replace(correction.original, correction.corrected);
+    }
+
+    setEditedText(newText);
+    setShowReviewModal(false);
+    setCorrections([]);
+    setFormattingChanges([]);
+    setMessage({ type: 'success', text: `تم تطبيق ${approvedTextCorrections.length} تصحيح` });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center" dir="rtl">
@@ -237,6 +331,30 @@ export default function ReviewDetailPage({ params }: { params: Promise<{ id: str
             </div>
 
             <div className="flex items-center gap-3">
+              {/* AI Correction Button */}
+              <button
+                onClick={handleRunAI}
+                disabled={runningAI || !editedText.trim()}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium shadow-md transition-all"
+              >
+                {runningAI ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <span>جاري التحليل...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    <span>🤖 تصحيح بالذكاء الاصطناعي</span>
+                  </>
+                )}
+              </button>
+
               {/* Accuracy Badge */}
               {collection.accuracyScore !== undefined && (
                 <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full ${
@@ -379,6 +497,7 @@ export default function ReviewDetailPage({ params }: { params: Promise<{ id: str
                       width={800}
                       height={1000}
                       className="w-full rounded-lg"
+                      priority
                     />
                   </div>
                 )
@@ -399,9 +518,15 @@ export default function ReviewDetailPage({ params }: { params: Promise<{ id: str
               <textarea
                 value={editedText}
                 onChange={(e) => setEditedText(e.target.value)}
-                className="w-full h-[50vh] p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none text-lg leading-relaxed"
+                className="w-full h-[50vh] p-6 border-2 border-amber-300 rounded-xl focus:ring-3 focus:ring-amber-500 focus:border-amber-500 resize-none bg-white text-gray-900 shadow-inner"
                 placeholder="النص المستخرج من OCR سيظهر هنا..."
                 dir="rtl"
+                style={{ 
+                  fontFamily: "'Amiri', 'Noto Naskh Arabic', Georgia, serif",
+                  fontSize: '22px',
+                  lineHeight: '2.4',
+                  letterSpacing: '0.02em',
+                }}
               />
             </div>
 
@@ -494,6 +619,22 @@ export default function ReviewDetailPage({ params }: { params: Promise<{ id: str
           </div>
         )}
       </main>
+
+      {/* AI Correction Review Modal */}
+      <ChangeReviewModal
+        isOpen={showReviewModal && (corrections.length > 0 || formattingChanges.length > 0)}
+        onClose={() => {
+          setShowReviewModal(false);
+          setCorrections([]);
+          setFormattingChanges([]);
+        }}
+        corrections={corrections}
+        formattingChanges={formattingChanges}
+        originalText={editedText}
+        onUpdateCorrection={handleUpdateCorrection}
+        onUpdateFormatting={handleUpdateFormatting}
+        onComplete={handleApplyCorrections}
+      />
     </div>
   );
 }

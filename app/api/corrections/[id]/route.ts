@@ -2,10 +2,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import Document from '@/models/Document';
+import Collection from '@/models/Collection';
 import { detectTextCorrections } from '@/lib/ai-agent';
 import mongoose from 'mongoose';
 
-// POST - Run AI detection on document text
+// POST - Run AI detection on document or collection text
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -15,55 +16,86 @@ export async function POST(
     
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
-        { error: 'Valid document ID is required' },
+        { error: 'Valid ID is required' },
         { status: 400 }
       );
     }
 
     await connectDB();
 
-    // Get the document
-    const document = await Document.findById(id);
-
-    if (!document) {
-      return NextResponse.json(
-        { error: 'Document not found' },
-        { status: 404 }
-      );
-    }
-
-    // Get text from request body, or use document's OCR text
+    // Get text from request body
     const body = await request.json().catch(() => ({}));
-    const textToAnalyze = body.text || document.verifiedText || document.ocrText;
+    let textToAnalyze = body.text;
+    let entityType: 'document' | 'collection' = 'document';
+    let entity = null;
+
+    // If no text provided, try to find document or collection
+    if (!textToAnalyze) {
+      // First try to find as Collection
+      const collection = await Collection.findById(id);
+      if (collection) {
+        entityType = 'collection';
+        entity = collection;
+        textToAnalyze = collection.combinedAiText || collection.combinedOcrText;
+      } else {
+        // Try to find as Document
+        const document = await Document.findById(id);
+        if (document) {
+          entityType = 'document';
+          entity = document;
+          textToAnalyze = document.verifiedText || document.ocrText;
+        }
+      }
+    } else {
+      // Text provided in body, still check if entity exists for updates
+      const collection = await Collection.findById(id);
+      if (collection) {
+        entityType = 'collection';
+        entity = collection;
+      } else {
+        const document = await Document.findById(id);
+        if (document) {
+          entityType = 'document';
+          entity = document;
+        }
+      }
+    }
 
     if (!textToAnalyze || textToAnalyze.trim() === '') {
       return NextResponse.json(
-        { error: 'No text to analyze' },
+        { error: 'No text to analyze. Please provide text in the request body or ensure the document/collection has OCR text.' },
         { status: 400 }
       );
     }
 
     // Run AI detection
     const result = await detectTextCorrections(textToAnalyze, {
-      model: body.model || 'gpt-4o',
+      model: body.model || 'gpt-4o-mini',
       confidenceThreshold: body.confidenceThreshold ?? 0.95,
     });
 
-    // Update document with pending corrections
-    await Document.findByIdAndUpdate(id, {
-      $set: {
+    // Update entity with pending corrections if found
+    if (entity) {
+      const updateData = {
         pendingCorrections: result.corrections,
         pendingFormattingChanges: result.formattingChanges,
         aiDetectionConfidence: result.confidence,
         aiDetectionCost: result.cost,
         aiDetectionModelUsed: result.modelUsed,
         aiDetectedAt: new Date(),
-      },
-    });
+      };
+
+      if (entityType === 'collection') {
+        await Collection.findByIdAndUpdate(id, { $set: updateData });
+      } else {
+        await Document.findByIdAndUpdate(id, { $set: updateData });
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      documentId: id,
+      entityId: id,
+      entityType,
       corrections: result.corrections,
       formattingChanges: result.formattingChanges,
       totalCorrections: result.totalCorrections,
