@@ -37,6 +37,31 @@ interface LinkedCharacter {
   type?: string;
   photoImage?: string;
   biography?: string;
+  tmdbId?: number;
+  birthYear?: number;
+  deathYear?: number;
+}
+
+interface CastMember {
+  tmdbId: number;
+  name: string;
+  character: string;
+  profileImage: string | null;
+  order: number;
+  department: string;
+}
+
+interface FilmographyMovie {
+  tmdbId?: number;
+  _id?: string;
+  arabicName: string;
+  englishName?: string;
+  year?: number | null;
+  posterImage?: string | null;
+  character?: string;
+  role?: string;
+  voteAverage?: number;
+  source: 'local' | 'tmdb';
 }
 
 interface Collection {
@@ -94,6 +119,11 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const [selectedPage, setSelectedPage] = useState<number | null>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  
+  // Cast and filmography state
+  const [movieCast, setMovieCast] = useState<CastMember[]>([]);
+  const [characterFilmography, setCharacterFilmography] = useState<FilmographyMovie[]>([]);
+  const [loadingRelated, setLoadingRelated] = useState(false);
 
   useEffect(() => {
     const fetchCollection = async () => {
@@ -111,6 +141,40 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
     };
     fetchCollection();
   }, [id]);
+
+  // Fetch movie cast or character filmography
+  useEffect(() => {
+    if (!collection) return;
+
+    const fetchRelatedData = async () => {
+      setLoadingRelated(true);
+      try {
+        // If linked to a movie, fetch cast
+        if (collection.linkType === 'movie' && collection.linkedMovie?._id) {
+          const response = await fetch(`/api/movies/${collection.linkedMovie._id}/cast`);
+          if (response.ok) {
+            const data = await response.json();
+            setMovieCast(data.cast || []);
+          }
+        }
+        
+        // If linked to a character, fetch filmography
+        if (collection.linkType === 'character' && collection.linkedCharacter?._id) {
+          const response = await fetch(`/api/characters/${collection.linkedCharacter._id}/filmography`);
+          if (response.ok) {
+            const data = await response.json();
+            setCharacterFilmography(data.filmography || []);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch related data:', error);
+      } finally {
+        setLoadingRelated(false);
+      }
+    };
+
+    fetchRelatedData();
+  }, [collection]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('ar-EG', {
@@ -431,6 +495,120 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
                 </div>
               </div>
             </div>
+            
+            {/* Movie Cast Section */}
+            {collection.linkType === 'movie' && movieCast.length > 0 && (
+              <div className="max-w-7xl mx-auto px-6 pb-8">
+                <div className="vintage-card rounded-xl overflow-hidden">
+                  <div className="p-4 border-b border-[#3a3020] bg-[#2a2318] flex items-center justify-between">
+                    <h3 className="font-bold text-[#d4a012] flex items-center gap-2">
+                      <span className="text-xl">⭐</span>
+                      طاقم التمثيل
+                    </h3>
+                    <span className="text-sm text-[#7a6545]">{movieCast.length} ممثل</span>
+                  </div>
+                  <div className="p-4 bg-[#1a1510]">
+                    {loadingRelated ? (
+                      <div className="flex justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#d4a012]"></div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
+                        {movieCast.map((member) => (
+                          <div
+                            key={member.tmdbId}
+                            className="flex-shrink-0 w-28 text-center group"
+                          >
+                            <div className="relative w-24 h-24 mx-auto rounded-full overflow-hidden ring-2 ring-[#3a3020] group-hover:ring-[#d4a012] transition-all">
+                              {member.profileImage ? (
+                                <Image
+                                  src={member.profileImage}
+                                  alt={member.name}
+                                  fill
+                                  className="object-cover"
+                                  sizes="96px"
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-[#2a2318] flex items-center justify-center">
+                                  <span className="text-3xl">👤</span>
+                                </div>
+                              )}
+                            </div>
+                            <h4 className="mt-2 text-sm font-semibold text-[#d4c4a8] truncate">{member.name}</h4>
+                            <p className="text-xs text-[#7a6545] truncate">{member.character}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Character Filmography Section */}
+            {collection.linkType === 'character' && characterFilmography.length > 0 && (
+              <div className="max-w-7xl mx-auto px-6 pb-8">
+                <div className="vintage-card rounded-xl overflow-hidden">
+                  <div className="p-4 border-b border-[#3a3020] bg-[#2a2318] flex items-center justify-between">
+                    <h3 className="font-bold text-[#d4a012] flex items-center gap-2">
+                      <span className="text-xl">🎬</span>
+                      الأعمال الفنية
+                    </h3>
+                    <span className="text-sm text-[#7a6545]">{characterFilmography.length} فيلم</span>
+                  </div>
+                  <div className="p-4 bg-[#1a1510]">
+                    {loadingRelated ? (
+                      <div className="flex justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#d4a012]"></div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
+                        {characterFilmography.map((movie, index) => (
+                          <div
+                            key={movie.tmdbId || movie._id || index}
+                            className="flex-shrink-0 w-32 group"
+                          >
+                            <div className="relative aspect-[2/3] rounded-lg overflow-hidden ring-2 ring-[#3a3020] group-hover:ring-[#d4a012] transition-all">
+                              {movie.posterImage ? (
+                                <Image
+                                  src={movie.posterImage}
+                                  alt={movie.arabicName}
+                                  fill
+                                  className="object-cover"
+                                  sizes="128px"
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-[#2a2318] flex items-center justify-center">
+                                  <span className="text-4xl">🎬</span>
+                                </div>
+                              )}
+                              {movie.voteAverage && movie.voteAverage > 0 && (
+                                <div className="absolute top-1 right-1 px-1.5 py-0.5 bg-black/70 rounded text-xs text-yellow-400 font-bold flex items-center gap-0.5">
+                                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                  </svg>
+                                  {movie.voteAverage.toFixed(1)}
+                                </div>
+                              )}
+                            </div>
+                            <h4 className="mt-2 text-sm font-semibold text-[#d4c4a8] truncate">{movie.arabicName}</h4>
+                            <div className="flex items-center justify-between text-xs text-[#7a6545]">
+                              <span>{movie.year || '—'}</span>
+                              {movie.character && (
+                                <span className="truncate max-w-16" title={movie.character}>{movie.character}</span>
+                              )}
+                              {movie.role && (
+                                <span className="text-[#d4a012]">{movie.role}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
