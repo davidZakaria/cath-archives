@@ -11,6 +11,7 @@ interface LinkedEntity {
   year?: number;
   type?: string;
   posterImage?: string;
+  photoImage?: string; // For characters
   tmdbId?: number;
   voteAverage?: number;
 }
@@ -296,18 +297,18 @@ export default function ArchivePage() {
                   className="group vintage-card rounded-xl overflow-hidden hover:border-[#c9a227] transition-all duration-300 transform hover:-translate-y-2 hover:shadow-lg hover:shadow-[#c9a227]/20"
                 >
                   <div className="aspect-[3/4] relative bg-[#2a2318] movie-poster">
-                    {/* Prefer TMDB poster if available, then cover image */}
-                    {col.linkedMovie?.posterImage || col.coverImagePath ? (
+                    {/* Prefer TMDB poster/photo if available, then cover image */}
+                    {col.linkedMovie?.posterImage || col.linkedCharacter?.photoImage || col.coverImagePath ? (
                       <Image
-                        src={col.linkedMovie?.posterImage || col.coverImagePath || ''}
+                        src={col.linkedMovie?.posterImage || col.linkedCharacter?.photoImage || col.coverImagePath || ''}
                         alt={col.title}
                         fill
-                        className={`object-cover group-hover:scale-105 transition-transform duration-500 ${col.linkedMovie?.posterImage ? '' : 'sepia-photo'}`}
+                        className={`object-cover group-hover:scale-105 transition-transform duration-500 ${(col.linkedMovie?.posterImage || col.linkedCharacter?.photoImage) ? '' : 'sepia-photo'}`}
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <span className="text-7xl opacity-40">🎬</span>
+                        <span className="text-7xl opacity-40">{col.linkType === 'character' ? '⭐' : '🎬'}</span>
                       </div>
                     )}
                     
