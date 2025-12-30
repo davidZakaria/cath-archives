@@ -8,6 +8,8 @@ import Document from '@/models/Document';
 import Batch from '@/models/Batch';
 import { performOCRFromBuffer } from '@/lib/google-vision';
 import sharp from 'sharp';
+import { compressImage, formatBytes } from '@/lib/image-compression';
+import { preprocessArabicDocument } from '@/lib/image-preprocessing';
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,24 +54,36 @@ export async function POST(request: NextRequest) {
       try {
         // Convert file to buffer
         const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
+        const originalBuffer = Buffer.from(bytes);
 
-        // Get image metadata using sharp
+        // Compress image to max 1MB for faster OCR and storage optimization
+        const compression = await compressImage(originalBuffer, {
+          maxSizeKB: 1024, // 1MB target
+          maxWidth: 3000,
+          maxHeight: 4000,
+        });
+        
+        const buffer = compression.buffer;
+        console.log(`[Compression] ${file.name}: ${formatBytes(compression.originalSize)} → ${formatBytes(compression.compressedSize)} (${compression.compressionRatio.toFixed(2)}x)`);
+
+        // Get image metadata from compressed image
         const metadata = await sharp(buffer).metadata();
         const imageMetadata = {
           width: metadata.width || 0,
           height: metadata.height || 0,
           size: buffer.length,
           format: metadata.format || 'unknown',
+          originalSize: compression.originalSize,
+          compressionRatio: compression.compressionRatio,
         };
 
-        // Generate unique filename
+        // Generate unique filename (use .jpg extension for compressed images)
         const timestamp = Date.now();
-        const safeFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const safeFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_').replace(/\.[^.]+$/, '.jpg');
         const filename = `${timestamp}-${index}-${safeFilename}`;
         const filepath = join(process.cwd(), 'public', 'uploads', filename);
 
-        // Save file to public/uploads
+        // Save compressed file to public/uploads
         await writeFile(filepath, buffer);
 
         const imagePath = `/uploads/${filename}`;
@@ -167,8 +181,12 @@ export async function POST(request: NextRequest) {
 // Separate function to perform OCR and update document + batch
 async function processOCR(documentId: string, imageBuffer: Buffer, batchId: string) {
   try {
-    // Perform OCR using Google Cloud Vision
-    const ocrResult = await performOCRFromBuffer(imageBuffer);
+    // Preprocess image for better OCR accuracy (Arabic-optimized)
+    const preprocessed = await preprocessArabicDocument(imageBuffer);
+    console.log(`[Preprocessing] Document ${documentId}: Applied ${preprocessed.appliedOperations.join(', ')}`);
+    
+    // Perform OCR using Google Cloud Vision on preprocessed image
+    const ocrResult = await performOCRFromBuffer(preprocessed.buffer);
 
     // Update document with OCR results
     await connectDB();

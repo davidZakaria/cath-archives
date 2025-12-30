@@ -13,6 +13,8 @@ import { performOCRFromBuffer } from '@/lib/google-vision';
 import sharp from 'sharp';
 import { searchMovies, fetchAndConvertMovie, enrichCharacterWithTMDBData } from '@/lib/tmdb';
 import Character from '@/models/Character';
+import { compressImage, formatBytes } from '@/lib/image-compression';
+import { preprocessArabicDocument } from '@/lib/image-preprocessing';
 
 // POST - Create a new collection with multiple pages
 export async function POST(request: NextRequest) {
@@ -69,20 +71,32 @@ export async function POST(request: NextRequest) {
       try {
         // Convert file to buffer
         const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
+        const originalBuffer = Buffer.from(bytes);
 
-        // Get image metadata
+        // Compress image to max 1MB for faster OCR and storage optimization
+        const compression = await compressImage(originalBuffer, {
+          maxSizeKB: 1024, // 1MB target
+          maxWidth: 3000,
+          maxHeight: 4000,
+        });
+        
+        const buffer = compression.buffer;
+        console.log(`[Compression] Page ${i + 1} - ${file.name}: ${formatBytes(compression.originalSize)} → ${formatBytes(compression.compressedSize)} (${compression.compressionRatio.toFixed(2)}x)`);
+
+        // Get image metadata from compressed image
         const metadata = await sharp(buffer).metadata();
         const imageMetadata = {
           width: metadata.width || 0,
           height: metadata.height || 0,
           size: buffer.length,
           format: metadata.format || 'unknown',
+          originalSize: compression.originalSize,
+          compressionRatio: compression.compressionRatio,
         };
 
-        // Generate unique filename
+        // Generate unique filename (use .jpg extension for compressed images)
         const timestamp = Date.now();
-        const safeFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const safeFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_').replace(/\.[^.]+$/, '.jpg');
         const filename = `${collection._id}_page${i + 1}_${timestamp}_${safeFilename}`;
         
         // Create collection subfolder
@@ -170,7 +184,11 @@ async function processPageOCR(
   pageNumber: number
 ) {
   try {
-    const ocrResult = await performOCRFromBuffer(imageBuffer);
+    // Preprocess image for better OCR accuracy (Arabic-optimized)
+    const preprocessed = await preprocessArabicDocument(imageBuffer);
+    console.log(`[Preprocessing] Page ${pageNumber}: Applied ${preprocessed.appliedOperations.join(', ')}`);
+    
+    const ocrResult = await performOCRFromBuffer(preprocessed.buffer);
 
     await connectDB();
 

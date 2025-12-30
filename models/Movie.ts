@@ -43,7 +43,7 @@ const MovieSchema = new Schema<IMovie>(
     relatedDocuments: [{ type: Schema.Types.ObjectId, ref: 'Document' }],
     
     // TMDB Integration fields
-    tmdbId: { type: Number, index: true, sparse: true },
+    tmdbId: { type: Number },
     backdropImage: { type: String },
     originalLanguage: { type: String },
     popularity: { type: Number },

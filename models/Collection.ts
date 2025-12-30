@@ -98,6 +98,44 @@ export interface ICollection {
   aiDetectionModelUsed?: string;
   aiDetectedAt?: Date;
   
+  // AI Embedding for similarity search
+  embedding?: number[];
+  embeddingGeneratedAt?: Date;
+  
+  // Version History for digital preservation
+  versions?: Array<{
+    versionNumber: number;
+    changes: string;
+    modifiedBy?: string;
+    modifiedAt: Date;
+    snapshot: {
+      title: string;
+      combinedOcrText?: string;
+      combinedAiText?: string;
+    };
+  }>;
+  currentVersion?: number;
+  
+  // Dublin Core Metadata for archival standards
+  dublinCore?: {
+    // Core elements
+    title?: string;           // Name of the resource
+    creator?: string[];       // Entity responsible for making the resource
+    subject?: string[];       // Topic of the resource
+    description?: string;     // Account of the resource
+    publisher?: string;       // Entity responsible for making resource available
+    contributor?: string[];   // Entity responsible for contributions
+    date?: string;            // Date associated with the resource (ISO 8601)
+    type?: string;            // Nature or genre of the resource
+    format?: string;          // Physical or digital format
+    identifier?: string;      // Unique identifier (URI, ISBN, etc.)
+    source?: string;          // Related resource from which this is derived
+    language?: string;        // Language of the resource (ISO 639-1)
+    relation?: string[];      // Related resources
+    coverage?: string;        // Spatial or temporal coverage
+    rights?: string;          // Rights information
+  };
+  
   // Timestamps
   createdAt: Date;
   updatedAt: Date;
@@ -213,14 +251,50 @@ const CollectionSchema = new Schema<ICollection>(
     aiDetectionCost: { type: Number },
     aiDetectionModelUsed: { type: String },
     aiDetectedAt: { type: Date },
+    
+    // AI Embedding for similarity search
+    embedding: [{ type: Number }],
+    embeddingGeneratedAt: { type: Date },
+    
+    // Version History for digital preservation
+    versions: [{
+      versionNumber: { type: Number, required: true },
+      changes: { type: String },
+      modifiedBy: { type: String },
+      modifiedAt: { type: Date, default: Date.now },
+      snapshot: {
+        title: { type: String },
+        combinedOcrText: { type: String },
+        combinedAiText: { type: String },
+      },
+    }],
+    currentVersion: { type: Number, default: 1 },
+    
+    // Dublin Core Metadata for archival standards
+    dublinCore: {
+      title: { type: String },
+      creator: [{ type: String }],
+      subject: [{ type: String }],
+      description: { type: String },
+      publisher: { type: String },
+      contributor: [{ type: String }],
+      date: { type: String },
+      type: { type: String },
+      format: { type: String },
+      identifier: { type: String },
+      source: { type: String },
+      language: { type: String, default: 'ar' },
+      relation: [{ type: String }],
+      coverage: { type: String },
+      rights: { type: String },
+    },
   },
   {
     timestamps: true,
   }
 );
 
-// Indexes
-CollectionSchema.index({ title: 'text' }); // Text search on title only
+// Indexes for querying
 CollectionSchema.index({ processingStatus: 1 });
 CollectionSchema.index({ status: 1 });
 CollectionSchema.index({ linkedMovie: 1 });
@@ -229,6 +303,38 @@ CollectionSchema.index({ publishedAt: -1 });
 CollectionSchema.index({ createdAt: -1 });
 CollectionSchema.index({ 'metadata.movies': 1 });
 CollectionSchema.index({ 'metadata.characters': 1 });
+
+// Full-text search index for advanced search
+CollectionSchema.index(
+  {
+    title: 'text',
+    subtitle: 'text',
+    description: 'text',
+    combinedOcrText: 'text',
+    combinedAiText: 'text',
+    'combinedFormattedContent.title': 'text',
+    'combinedFormattedContent.body': 'text',
+    'metadata.movies': 'text',
+    'metadata.characters': 'text',
+    'metadata.source': 'text',
+  },
+  {
+    weights: {
+      title: 10,
+      'combinedFormattedContent.title': 8,
+      subtitle: 5,
+      'metadata.movies': 4,
+      'metadata.characters': 4,
+      description: 3,
+      combinedAiText: 2,
+      combinedOcrText: 1,
+      'combinedFormattedContent.body': 1,
+      'metadata.source': 1,
+    },
+    name: 'collection_text_search',
+    default_language: 'arabic',
+  }
+);
 
 const Collection: Model<ICollection> =
   mongoose.models.Collection || mongoose.model<ICollection>('Collection', CollectionSchema);

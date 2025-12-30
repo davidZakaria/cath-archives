@@ -22,6 +22,7 @@ export const translations: Translations = {
   'nav.ocrQueue': { ar: 'طابور OCR', en: 'OCR Queue' },
   'nav.categories': { ar: 'التصنيفات', en: 'Categories' },
   'nav.settings': { ar: 'الإعدادات', en: 'Settings' },
+  'nav.backup': { ar: 'النسخ الاحتياطي', en: 'Backup' },
   
   // Header
   'header.title': { ar: 'سينما زمان', en: 'Cinema Zaman' },

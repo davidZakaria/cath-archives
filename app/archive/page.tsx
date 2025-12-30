@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import AdvancedSearch from '@/components/AdvancedSearch';
+import TimelineView from '@/components/TimelineView';
 
 interface LinkedEntity {
   _id: string;
@@ -40,7 +42,7 @@ export default function ArchivePage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'movie' | 'character'>('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'timeline' | 'search'>('grid');
 
   const fetchCollections = useCallback(async () => {
     setLoading(true);
@@ -251,6 +253,7 @@ export default function ArchivePage() {
                 className={`p-2.5 rounded transition-all ${
                   viewMode === 'grid' ? 'bg-[#3a3020] text-[#c9a227]' : 'text-[#7a6540] hover:text-[#c9a227]'
                 }`}
+                title="عرض شبكي"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
@@ -261,22 +264,55 @@ export default function ArchivePage() {
                 className={`p-2.5 rounded transition-all ${
                   viewMode === 'list' ? 'bg-[#3a3020] text-[#c9a227]' : 'text-[#7a6540] hover:text-[#c9a227]'
                 }`}
+                title="عرض قائمة"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
+              <button
+                onClick={() => setViewMode('timeline')}
+                className={`p-2.5 rounded transition-all ${
+                  viewMode === 'timeline' ? 'bg-[#3a3020] text-[#c9a227]' : 'text-[#7a6540] hover:text-[#c9a227]'
+                }`}
+                title="الجدول الزمني"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setViewMode('search')}
+                className={`p-2.5 rounded transition-all ${
+                  viewMode === 'search' ? 'bg-[#3a3020] text-[#c9a227]' : 'text-[#7a6540] hover:text-[#c9a227]'
+                }`}
+                title="بحث متقدم"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+              </button>
             </div>
           </div>
 
-          {/* Collections */}
-          {loading ? (
+          {/* Timeline View */}
+          {viewMode === 'timeline' && (
+            <TimelineView language="ar" />
+          )}
+
+          {/* Advanced Search View */}
+          {viewMode === 'search' && (
+            <AdvancedSearch language="ar" showFilters={true} defaultStatus="published" />
+          )}
+
+          {/* Collections - Grid/List Views */}
+          {(viewMode === 'grid' || viewMode === 'list') && loading ? (
             <div className="text-center py-24">
               <div className="film-spinner mx-auto mb-6"></div>
               <p className="text-[#c9a227] text-xl arabic-title">جاري تحميل الأرشيف...</p>
               <p className="text-[#8b7319] text-sm mt-2">LOADING ARCHIVES</p>
             </div>
-          ) : filteredCollections.length === 0 ? (
+          ) : (viewMode === 'grid' || viewMode === 'list') && filteredCollections.length === 0 ? (
             <div className="text-center py-24">
               <div className="w-28 h-28 mx-auto mb-6 rounded-full bg-[#2a2318] flex items-center justify-center border-2 border-[#5c4108]">
                 <span className="text-6xl">🎞️</span>
@@ -288,7 +324,7 @@ export default function ArchivePage() {
                 رفع مقال جديد
               </Link>
             </div>
-          ) : viewMode === 'grid' ? (
+          ) : (viewMode === 'grid' || viewMode === 'list') && viewMode === 'grid' ? (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredCollections.map((col) => (
                 <Link
@@ -366,7 +402,7 @@ export default function ArchivePage() {
                 </Link>
               ))}
             </div>
-          ) : (
+          ) : viewMode === 'list' ? (
             <div className="space-y-4">
               {filteredCollections.map((col) => (
                 <Link
@@ -436,7 +472,7 @@ export default function ArchivePage() {
                 </Link>
               ))}
             </div>
-          )}
+          ) : null}
         </main>
 
         {/* Footer */}

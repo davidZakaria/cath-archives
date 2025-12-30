@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import ChangeReviewModal from '@/components/ChangeReviewModal';
+import VersionHistory from '@/components/VersionHistory';
+import DublinCoreEditor from '@/components/DublinCoreEditor';
 import { AICorrection, FormattingChange, CorrectionStatus } from '@/types';
 
 interface Page {
@@ -600,6 +602,33 @@ export default function ReviewDetailPage({ params }: { params: Promise<{ id: str
                 </div>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Digital Preservation Section */}
+        <div className="mt-8 grid lg:grid-cols-2 gap-6">
+          {/* Version History */}
+          <div>
+            <VersionHistory 
+              collectionId={collection._id} 
+              currentText={editedText}
+              language="ar"
+              onRestore={() => {
+                fetchCollection(); // Refresh after restore
+              }}
+            />
+          </div>
+          
+          {/* Dublin Core Metadata Editor */}
+          <div>
+            <DublinCoreEditor 
+              collectionId={collection._id}
+              language="ar"
+              onSave={() => {
+                setMessage({ type: 'success', text: 'تم حفظ البيانات الوصفية' });
+                setTimeout(() => setMessage(null), 3000);
+              }}
+            />
           </div>
         </div>
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import AudioNarration from '@/components/AudioNarration';
 
 interface Page {
   documentId: string;
@@ -768,9 +769,65 @@ export default function ArchiveDetailPage({ params }: { params: Promise<{ id: st
 
           {/* Article Text */}
           <div className="vintage-card rounded-xl overflow-hidden">
-            <div className="p-4 border-b border-[#3a3020] bg-[#2a2318]">
+            <div className="p-4 border-b border-[#3a3020] bg-[#2a2318] flex items-center justify-between">
               <h2 className="font-bold text-[#d4a012]">نص المقال</h2>
             </div>
+            
+            {/* Audio Narration Player - reads title and linked entity name */}
+            {(() => {
+              // Build narration text from available content - no cleaning, pass raw text
+              const narrationParts: string[] = [];
+              
+              // Add collection title
+              const title = collection.title?.trim();
+              if (title) {
+                narrationParts.push(title);
+              }
+              
+              // Add linked movie/character name
+              if (movie?.arabicName) {
+                narrationParts.push(`فيلم ${movie.arabicName}`);
+                if (movie.year) narrationParts.push(`سنة ${movie.year}`);
+              } else if (character?.arabicName) {
+                narrationParts.push(character.arabicName);
+              }
+              
+              // Add description if available
+              const desc = collection.description?.trim();
+              if (desc) {
+                narrationParts.push(desc);
+              }
+              
+              const narrationText = narrationParts.filter(p => p && p.length > 0).join('. ');
+              
+              // Debug: log the narration text and its character codes
+              console.log('Narration text:', narrationText);
+              console.log('Title raw:', collection.title);
+              console.log('Movie name raw:', movie?.arabicName);
+              console.log('Character codes:', narrationText.split('').map(c => c.charCodeAt(0)));
+              
+              return (
+                <div className="p-4 border-b border-[#3a3020] bg-[#1a1510]">
+                  {/* Show what will be read */}
+                  <div className="mb-3 p-3 bg-[#0d0a08] rounded-lg border border-[#3a3020]">
+                    <p className="text-xs text-[#7a6545] mb-1">سيتم قراءة:</p>
+                    <p className="text-sm text-[#d4c4a8] leading-relaxed" dir="rtl">
+                      {narrationText || 'لا يوجد نص للقراءة'}
+                    </p>
+                    {/* Debug info */}
+                    <p className="text-xs text-[#5a4530] mt-2">
+                      Debug: title="{collection.title}" | movie="{movie?.arabicName}" | char="{character?.arabicName}"
+                    </p>
+                  </div>
+                  {narrationText && (
+                    <AudioNarration 
+                      text={narrationText} 
+                      language="ar" 
+                    />
+                  )}
+                </div>
+              );
+            })()}
             
             <div className="p-8 bg-[#1a1510]">
               {collection.combinedFormattedContent && (collection.combinedFormattedContent.title || collection.combinedFormattedContent.body) ? (

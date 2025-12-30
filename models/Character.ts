@@ -53,7 +53,7 @@ const CharacterSchema = new Schema<ICharacter>(
     relatedDocuments: [{ type: Schema.Types.ObjectId, ref: 'Document' }],
     
     // TMDB Integration fields
-    tmdbId: { type: Number, index: true, sparse: true },
+    tmdbId: { type: Number },
     popularity: { type: Number },
     knownForDepartment: { type: String },
     tmdbLastUpdated: { type: Date },
