@@ -11,11 +11,21 @@ export interface ICharacter {
   biography?: string;
   birthYear?: number;
   deathYear?: number;
+  birthDate?: string;
+  deathDate?: string;
   nationality?: string;
+  birthPlace?: string;
   photoImage?: string;
   movies?: mongoose.Types.ObjectId[];
   documentCount: number;
   relatedDocuments?: mongoose.Types.ObjectId[];
+  
+  // TMDB Integration fields
+  tmdbId?: number;
+  popularity?: number;
+  knownForDepartment?: string;
+  tmdbLastUpdated?: Date;
+  
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,11 +43,20 @@ const CharacterSchema = new Schema<ICharacter>(
     biography: { type: String },
     birthYear: { type: Number },
     deathYear: { type: Number },
+    birthDate: { type: String },
+    deathDate: { type: String },
     nationality: { type: String },
+    birthPlace: { type: String },
     photoImage: { type: String },
     movies: [{ type: Schema.Types.ObjectId, ref: 'Movie' }],
     documentCount: { type: Number, default: 0 },
     relatedDocuments: [{ type: Schema.Types.ObjectId, ref: 'Document' }],
+    
+    // TMDB Integration fields
+    tmdbId: { type: Number, index: true, sparse: true },
+    popularity: { type: Number },
+    knownForDepartment: { type: String },
+    tmdbLastUpdated: { type: Date },
   },
   {
     timestamps: true,
@@ -49,6 +68,9 @@ CharacterSchema.index({ arabicName: 'text', englishName: 'text', biography: 'tex
 
 // Unique compound index to prevent duplicates
 CharacterSchema.index({ arabicName: 1, type: 1 }, { unique: true, sparse: true });
+
+// TMDB ID unique index
+CharacterSchema.index({ tmdbId: 1 }, { unique: true, sparse: true });
 
 const Character: Model<ICharacter> =
   mongoose.models.Character || mongoose.model<ICharacter>('Character', CharacterSchema);

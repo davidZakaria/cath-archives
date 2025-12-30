@@ -11,7 +11,8 @@ import Movie from '@/models/Movie';
 import '@/models/Character';
 import { performOCRFromBuffer } from '@/lib/google-vision';
 import sharp from 'sharp';
-import { searchMovies, fetchAndConvertMovie } from '@/lib/tmdb';
+import { searchMovies, fetchAndConvertMovie, enrichCharacterWithTMDBData } from '@/lib/tmdb';
+import Character from '@/models/Character';
 
 // POST - Create a new collection with multiple pages
 export async function POST(request: NextRequest) {
@@ -132,7 +133,14 @@ export async function POST(request: NextRequest) {
     // Auto-enrich linked movie with TMDB data (in background)
     if (linkType === 'movie' && linkedMovie) {
       enrichMovieWithTMDB(linkedMovie).catch(err => 
-        console.error('Background TMDB enrichment failed:', err)
+        console.error('Background TMDB movie enrichment failed:', err)
+      );
+    }
+    
+    // Auto-enrich linked character with TMDB data (in background)
+    if (linkType === 'character' && linkedCharacter) {
+      enrichCharacterWithTMDB(linkedCharacter).catch(err => 
+        console.error('Background TMDB character enrichment failed:', err)
       );
     }
 
@@ -380,5 +388,58 @@ async function enrichMovieWithTMDB(movieId: string) {
     console.log(`[TMDB] Successfully enriched movie: ${movie.arabicName}`);
   } catch (error) {
     console.error(`[TMDB] Failed to enrich movie ${movieId}:`, error);
+  }
+}
+
+// Background function to enrich a character with TMDB data
+async function enrichCharacterWithTMDB(characterId: string) {
+  try {
+    await connectDB();
+    
+    const character = await Character.findById(characterId);
+    if (!character) {
+      console.log(`Character ${characterId} not found for TMDB enrichment`);
+      return;
+    }
+
+    // Skip if already has TMDB data
+    if (character.tmdbId && character.tmdbLastUpdated) {
+      console.log(`Character ${character.arabicName} already has TMDB data`);
+      return;
+    }
+
+    console.log(`[TMDB] Searching for character: ${character.arabicName}`);
+
+    // Use the enrichment function from tmdb lib
+    const tmdbData = await enrichCharacterWithTMDBData(
+      characterId,
+      character.arabicName,
+      character.englishName
+    );
+
+    if (!tmdbData) {
+      console.log(`[TMDB] No match found for character: ${character.arabicName}`);
+      return;
+    }
+
+    // Update character with TMDB data (preserve local data that's better)
+    await Character.findByIdAndUpdate(characterId, {
+      tmdbId: tmdbData.tmdbId,
+      englishName: character.englishName || tmdbData.englishName,
+      biography: character.biography || tmdbData.biography,
+      birthYear: character.birthYear || tmdbData.birthYear,
+      deathYear: character.deathYear || tmdbData.deathYear,
+      birthDate: tmdbData.birthDate,
+      deathDate: tmdbData.deathDate,
+      birthPlace: tmdbData.birthPlace,
+      photoImage: tmdbData.photoImage || character.photoImage, // Prefer TMDB photo
+      popularity: tmdbData.popularity,
+      knownForDepartment: tmdbData.knownForDepartment,
+      tmdbLastUpdated: new Date(),
+    });
+
+    console.log(`[TMDB] Successfully enriched character: ${character.arabicName}`);
+  } catch (error) {
+    console.error(`[TMDB] Failed to enrich character ${characterId}:`, error);
   }
 }

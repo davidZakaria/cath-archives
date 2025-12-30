@@ -372,3 +372,233 @@ export async function searchAndConvert(
   };
 }
 
+// ============================================
+// PERSON / ACTOR / DIRECTOR FUNCTIONS
+// ============================================
+
+export interface TMDBPerson {
+  id: number;
+  name: string;
+  original_name?: string;
+  biography: string;
+  birthday: string | null;
+  deathday: string | null;
+  place_of_birth: string | null;
+  profile_path: string | null;
+  popularity: number;
+  known_for_department: string;
+  gender: number;
+  adult: boolean;
+  also_known_as?: string[];
+  homepage?: string | null;
+}
+
+export interface TMDBPersonSearchResult {
+  page: number;
+  results: Array<{
+    id: number;
+    name: string;
+    original_name?: string;
+    profile_path: string | null;
+    popularity: number;
+    known_for_department: string;
+    gender: number;
+    known_for?: TMDBMovie[];
+  }>;
+  total_pages: number;
+  total_results: number;
+}
+
+export interface TMDBPersonCredits {
+  id: number;
+  cast: Array<{
+    id: number;
+    title: string;
+    original_title: string;
+    character: string;
+    release_date: string;
+    poster_path: string | null;
+    vote_average: number;
+  }>;
+  crew: Array<{
+    id: number;
+    title: string;
+    original_title: string;
+    job: string;
+    department: string;
+    release_date: string;
+    poster_path: string | null;
+  }>;
+}
+
+// Search for people (actors, directors, etc.)
+export async function searchPeople(
+  query: string,
+  options: {
+    page?: number;
+    language?: string;
+    includeAdult?: boolean;
+  } = {}
+): Promise<TMDBPersonSearchResult> {
+  const params: Record<string, string> = {
+    query,
+    page: String(options.page || 1),
+    language: options.language || 'ar-EG',
+    include_adult: String(options.includeAdult || false),
+  };
+
+  return tmdbFetch<TMDBPersonSearchResult>('/search/person', params);
+}
+
+// Get person details by TMDB ID
+export async function getPersonDetails(
+  tmdbId: number,
+  language: string = 'ar-EG'
+): Promise<TMDBPerson> {
+  return tmdbFetch<TMDBPerson>(`/person/${tmdbId}`, { language });
+}
+
+// Get person movie credits
+export async function getPersonMovieCredits(
+  tmdbId: number,
+  language: string = 'ar-EG'
+): Promise<TMDBPersonCredits> {
+  return tmdbFetch<TMDBPersonCredits>(`/person/${tmdbId}/movie_credits`, { language });
+}
+
+// Get popular people
+export async function getPopularPeople(
+  options: {
+    page?: number;
+    language?: string;
+  } = {}
+): Promise<TMDBPersonSearchResult> {
+  const params: Record<string, string> = {
+    page: String(options.page || 1),
+    language: options.language || 'ar-EG',
+  };
+
+  return tmdbFetch<TMDBPersonSearchResult>('/person/popular', params);
+}
+
+// Local character data format
+export interface LocalCharacterData {
+  arabicName: string;
+  englishName: string;
+  type: 'actor' | 'director' | 'producer' | 'writer' | 'other';
+  biography: string;
+  birthYear: number | undefined;
+  deathYear: number | undefined;
+  birthDate: string | undefined;
+  deathDate: string | undefined;
+  birthPlace: string | undefined;
+  photoImage: string | null;
+  tmdbId: number;
+  popularity: number;
+  knownForDepartment: string;
+  tmdbLastUpdated: Date;
+}
+
+// Map TMDB department to local type
+function mapDepartmentToType(department: string): 'actor' | 'director' | 'producer' | 'writer' | 'other' {
+  const dept = department.toLowerCase();
+  if (dept === 'acting') return 'actor';
+  if (dept === 'directing') return 'director';
+  if (dept === 'production') return 'producer';
+  if (dept === 'writing') return 'writer';
+  return 'other';
+}
+
+// Convert TMDB person to local character format
+export function convertTMDBPersonToLocal(person: TMDBPerson): LocalCharacterData {
+  // Try to find Arabic name in also_known_as
+  let arabicName = person.name;
+  let englishName = person.name;
+  
+  if (person.also_known_as && person.also_known_as.length > 0) {
+    // Look for Arabic name (contains Arabic characters)
+    const arabicNameFound = person.also_known_as.find(name => /[\u0600-\u06FF]/.test(name));
+    if (arabicNameFound) {
+      arabicName = arabicNameFound;
+      englishName = person.name;
+    }
+  }
+
+  // Extract years from dates
+  const birthYear = person.birthday ? parseInt(person.birthday.split('-')[0]) : undefined;
+  const deathYear = person.deathday ? parseInt(person.deathday.split('-')[0]) : undefined;
+
+  return {
+    arabicName,
+    englishName,
+    type: mapDepartmentToType(person.known_for_department),
+    biography: person.biography || '',
+    birthYear,
+    deathYear,
+    birthDate: person.birthday || undefined,
+    deathDate: person.deathday || undefined,
+    birthPlace: person.place_of_birth || undefined,
+    photoImage: getImageUrl(person.profile_path, IMAGE_SIZES.profile.large),
+    tmdbId: person.id,
+    popularity: person.popularity,
+    knownForDepartment: person.known_for_department,
+    tmdbLastUpdated: new Date(),
+  };
+}
+
+// Fetch full person details and convert to local format
+export async function fetchAndConvertPerson(tmdbId: number): Promise<LocalCharacterData> {
+  const personDetails = await getPersonDetails(tmdbId);
+  return convertTMDBPersonToLocal(personDetails);
+}
+
+// Discover popular Egyptian actors/directors
+export async function discoverEgyptianPeople(
+  options: {
+    page?: number;
+    language?: string;
+  } = {}
+): Promise<TMDBPersonSearchResult> {
+  // TMDB doesn't have direct country filter for people, so we search for common Egyptian names
+  // or get popular people and filter. For now, we'll return popular people.
+  return getPopularPeople(options);
+}
+
+// Enrich an existing character with TMDB data by searching for their name
+export async function enrichCharacterWithTMDBData(
+  characterId: string,
+  arabicName: string,
+  englishName?: string
+): Promise<LocalCharacterData | null> {
+  try {
+    // Search for the person by name (try English first, then Arabic)
+    const searchName = englishName || arabicName;
+    const searchResult = await searchPeople(searchName, { page: 1 });
+    
+    if (searchResult.results.length === 0 && englishName && arabicName !== englishName) {
+      // Try Arabic name if English didn't find anything
+      const arabicResult = await searchPeople(arabicName, { page: 1 });
+      if (arabicResult.results.length === 0) {
+        console.log(`[TMDB] No person found for: ${searchName} or ${arabicName}`);
+        return null;
+      }
+      searchResult.results = arabicResult.results;
+    }
+    
+    if (searchResult.results.length === 0) {
+      console.log(`[TMDB] No person found for: ${searchName}`);
+      return null;
+    }
+    
+    // Get the first matching person's full details
+    const tmdbPerson = searchResult.results[0];
+    const personDetails = await fetchAndConvertPerson(tmdbPerson.id);
+    
+    console.log(`[TMDB] Found person ${tmdbPerson.name} (ID: ${tmdbPerson.id}) for character ${arabicName}`);
+    return personDetails;
+  } catch (error) {
+    console.error('[TMDB] Error enriching character:', error);
+    return null;
+  }
+}
+
