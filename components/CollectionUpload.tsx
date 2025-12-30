@@ -254,7 +254,7 @@ export default function CollectionUpload() {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="مثال: مقال عن فيلم الناصر صلاح الدين"
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-lg"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-lg bg-white text-gray-900 placeholder-gray-400"
           disabled={uploading}
         />
       </div>

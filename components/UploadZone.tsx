@@ -359,7 +359,6 @@ export default function UploadZone() {
           id="folder-upload"
           // @ts-expect-error - webkitdirectory is not in React types
           webkitdirectory=""
-          // @ts-expect-error - directory is not in React types
           directory=""
           onChange={handleFolderSelect}
           className="hidden"

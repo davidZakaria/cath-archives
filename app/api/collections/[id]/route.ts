@@ -51,12 +51,13 @@ export async function GET(
     }
 
     // Full query with populate for detailed view
+    // Include all TMDB fields for movie display
     const collection = await Collection.findById(id)
       .populate('pages.documentId', 'filename ocrText ocrConfidence verifiedText reviewStatus')
-      .populate('linkedMovie', 'arabicName englishName year')
-      .populate('linkedCharacter', 'arabicName englishName type')
-      .populate('relatedMovies', 'arabicName englishName year')
-      .populate('relatedCharacters', 'arabicName englishName type')
+      .populate('linkedMovie', 'arabicName englishName year genres description directors posterImage backdropImage tmdbId voteAverage voteCount runtime tagline originalLanguage popularity')
+      .populate('linkedCharacter', 'arabicName englishName type photoImage biography birthDate deathDate')
+      .populate('relatedMovies', 'arabicName englishName year posterImage tmdbId voteAverage')
+      .populate('relatedCharacters', 'arabicName englishName type photoImage')
       .populate('extractedImages');
 
     if (!collection) {

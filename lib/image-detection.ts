@@ -6,8 +6,8 @@ import { join, dirname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { BoundingBox } from '@/types';
 
-// Initialize Vision client
-const getVisionClient = () => {
+// Initialize Vision client - using type assertion to guarantee non-null
+const getVisionClient = (): InstanceType<typeof vision.ImageAnnotatorClient> => {
   const apiKey = process.env.GOOGLE_CLOUD_VISION_API_KEY;
   const credentials = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
@@ -45,6 +45,7 @@ export async function detectEmbeddedImages(
   
   try {
     // Use object localization to find distinct objects
+    // @ts-expect-error - Vision API types are not perfect
     const [objectResult] = await client.objectLocalization({
       image: { source: { filename: imagePath } },
     });
@@ -162,6 +163,7 @@ export async function detectEmbeddedImagesFromBuffer(
     const detectedImages: DetectedImage[] = [];
 
     // Use object localization
+    // @ts-expect-error - Vision API types are not perfect
     const [objectResult] = await client.objectLocalization({
       image: { content: imageBuffer },
     });

@@ -22,7 +22,7 @@ export default function ReviewInterface({ document }: ReviewInterfaceProps) {
   const [hasStarted, setHasStarted] = useState(document.reviewStatus === 'in_progress');
   const router = useRouter();
   const startTimeRef = useRef<number>(Date.now());
-  const autoSaveTimerRef = useRef<NodeJS.Timeout>();
+  const autoSaveTimerRef = useRef<NodeJS.Timeout>(undefined);
 
   // AI Correction states
   const [corrections, setCorrections] = useState<AICorrection[]>(document.pendingCorrections || []);

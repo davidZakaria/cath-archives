@@ -6,11 +6,12 @@ import { v4 as uuidv4 } from 'uuid';
 import connectDB from '@/lib/mongodb';
 import Document from '@/models/Document';
 import Collection from '@/models/Collection';
+import Movie from '@/models/Movie';
 // Import models to register them with Mongoose (needed for populate)
-import '@/models/Movie';
 import '@/models/Character';
 import { performOCRFromBuffer } from '@/lib/google-vision';
 import sharp from 'sharp';
+import { searchMovies, fetchAndConvertMovie } from '@/lib/tmdb';
 
 // POST - Create a new collection with multiple pages
 export async function POST(request: NextRequest) {
@@ -127,6 +128,13 @@ export async function POST(request: NextRequest) {
       pages,
       processingStatus: 'processing_ocr',
     });
+
+    // Auto-enrich linked movie with TMDB data (in background)
+    if (linkType === 'movie' && linkedMovie) {
+      enrichMovieWithTMDB(linkedMovie).catch(err => 
+        console.error('Background TMDB enrichment failed:', err)
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -266,8 +274,8 @@ export async function GET(request: NextRequest) {
         .skip(skip)
         .limit(limit)
         .select('-combinedOcrText -combinedAiText') // Exclude large text fields for list
-        .populate('linkedMovie', 'arabicName englishName year')
-        .populate('linkedCharacter', 'arabicName englishName type'),
+        .populate('linkedMovie', 'arabicName englishName year posterImage tmdbId voteAverage')
+        .populate('linkedCharacter', 'arabicName englishName type photoImage'),
       Collection.countDocuments(query),
     ]);
 
@@ -287,5 +295,90 @@ export async function GET(request: NextRequest) {
       { error: 'Failed to fetch collections' },
       { status: 500 }
     );
+  }
+}
+
+// Background function to enrich a movie with TMDB data
+async function enrichMovieWithTMDB(movieId: string) {
+  try {
+    await connectDB();
+    
+    const movie = await Movie.findById(movieId);
+    if (!movie) {
+      console.log(`Movie ${movieId} not found for TMDB enrichment`);
+      return;
+    }
+
+    // Skip if already has TMDB data
+    if (movie.tmdbId && movie.tmdbLastUpdated) {
+      console.log(`Movie ${movie.arabicName} already has TMDB data`);
+      return;
+    }
+
+    console.log(`[TMDB] Searching for movie: ${movie.arabicName}`);
+
+    // Search TMDB by Arabic name first, then English name
+    let tmdbMovie = null;
+    
+    // Try Arabic name search
+    const arabicResults = await searchMovies(movie.arabicName, {
+      year: movie.year,
+      language: 'ar-EG',
+    });
+    
+    if (arabicResults.results.length > 0) {
+      // Find best match (same year if available)
+      tmdbMovie = arabicResults.results.find(m => {
+        const tmdbYear = m.release_date ? parseInt(m.release_date.split('-')[0]) : null;
+        return movie.year && tmdbYear === movie.year;
+      }) || arabicResults.results[0];
+    }
+
+    // If no Arabic match, try English name
+    if (!tmdbMovie && movie.englishName) {
+      const englishResults = await searchMovies(movie.englishName, {
+        year: movie.year,
+        language: 'en-US',
+      });
+      
+      if (englishResults.results.length > 0) {
+        tmdbMovie = englishResults.results.find(m => {
+          const tmdbYear = m.release_date ? parseInt(m.release_date.split('-')[0]) : null;
+          return movie.year && tmdbYear === movie.year;
+        }) || englishResults.results[0];
+      }
+    }
+
+    if (!tmdbMovie) {
+      console.log(`[TMDB] No match found for: ${movie.arabicName}`);
+      return;
+    }
+
+    console.log(`[TMDB] Found match: ${tmdbMovie.title} (ID: ${tmdbMovie.id})`);
+
+    // Fetch full movie details from TMDB
+    const tmdbData = await fetchAndConvertMovie(tmdbMovie.id);
+
+    // Update movie with TMDB data (preserve local data that's better)
+    await Movie.findByIdAndUpdate(movieId, {
+      tmdbId: tmdbData.tmdbId,
+      englishName: movie.englishName || tmdbData.englishName,
+      description: movie.description || tmdbData.description,
+      genres: movie.genres?.length ? movie.genres : tmdbData.genres,
+      directors: movie.directors?.length ? movie.directors : tmdbData.directors,
+      posterImage: tmdbData.posterImage || movie.posterImage, // Prefer TMDB poster
+      backdropImage: tmdbData.backdropImage,
+      originalLanguage: tmdbData.originalLanguage,
+      popularity: tmdbData.popularity,
+      voteAverage: tmdbData.voteAverage,
+      voteCount: tmdbData.voteCount,
+      runtime: tmdbData.runtime,
+      tagline: tmdbData.tagline,
+      tmdbLastUpdated: new Date(),
+    });
+
+    console.log(`[TMDB] Successfully enriched movie: ${movie.arabicName}`);
+  } catch (error) {
+    console.error(`[TMDB] Failed to enrich movie ${movieId}:`, error);
   }
 }

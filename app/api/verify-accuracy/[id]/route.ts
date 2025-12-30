@@ -120,11 +120,13 @@ export async function GET(
       );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const metadata = document.metadata as any;
     return NextResponse.json({
       success: true,
       documentId: id,
-      hasVerificationResult: !!document.metadata?.verificationResult,
-      verificationResult: document.metadata?.verificationResult || null,
+      hasVerificationResult: !!metadata?.verificationResult,
+      verificationResult: metadata?.verificationResult || null,
       hasText: !!(document.verifiedText || document.aiCorrectedText || document.ocrText),
     });
   } catch (error) {

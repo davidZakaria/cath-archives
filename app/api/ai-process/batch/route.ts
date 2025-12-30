@@ -82,9 +82,15 @@ export async function POST(request: NextRequest) {
 async function processBatchInBackground(
   documents: Array<{ id: string; ocrText: string }>
 ) {
-  const results = await batchProcessDocuments(documents, (processed, total) => {
-    console.log(`AI Processing: ${processed}/${total} documents`);
-  });
+  const { results, totalCost } = await batchProcessDocuments(
+    documents, 
+    {}, 
+    (processed, total, cost) => {
+      console.log(`AI Processing: ${processed}/${total} documents, cost: $${cost.toFixed(4)}`);
+    }
+  );
+
+  console.log(`Batch processing completed. Total cost: $${totalCost.toFixed(4)}`);
 
   // Update documents with results
   await connectDB();

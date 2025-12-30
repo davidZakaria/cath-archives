@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import UploadZone from '@/components/UploadZone';
-import CollectionUpload from '@/components/CollectionUpload';
 import StarsCarousel from '@/components/StarsCarousel';
 import Link from 'next/link';
 
@@ -19,7 +17,6 @@ const CLASSIC_MOVIES = [
 ];
 
 export default function HomePage() {
-  const [uploadMode, setUploadMode] = useState<'single' | 'collection'>('collection');
   const [currentStarIndex, setCurrentStarIndex] = useState(0);
 
   // Rotate through stars
@@ -166,68 +163,6 @@ export default function HomePage() {
             ))}
           </div>
         </div>
-
-        {/* Upload Section */}
-        <section className="py-16 px-6 relative">
-          {/* Lotus pattern decoration */}
-          <div className="absolute top-0 left-0 right-0 h-20 lotus-pattern opacity-30" />
-          
-          <div className="container mx-auto max-w-4xl">
-            {/* Section Header */}
-            <div className="text-center mb-10">
-              <div className="inline-flex items-center gap-4 mb-4">
-                <span className="text-[#c9a227] text-2xl">𓃭</span>
-                <h3 className="text-3xl font-bold text-[#c9a227] arabic-title">رفع الوثائق</h3>
-                <span className="text-[#c9a227] text-2xl">𓃭</span>
-              </div>
-              <p className="text-[#9c8550]">احفظ التراث السينمائي للأجيال القادمة</p>
-            </div>
-
-            {/* Upload Mode Tabs */}
-            <div className="flex justify-center mb-8">
-              <div className="vintage-card inline-flex p-1.5 rounded-xl">
-                <button
-                  onClick={() => setUploadMode('collection')}
-                  className={`px-8 py-3 rounded-lg font-bold transition-all flex items-center gap-3 ${
-                    uploadMode === 'collection'
-                      ? 'bg-gradient-to-b from-[#c9a227] to-[#8b7319] text-[#1a1612]'
-                      : 'text-[#9c8550] hover:text-[#c9a227]'
-                  }`}
-                >
-                  <span className="text-xl">📚</span>
-                  رفع مجموعة
-                </button>
-                <button
-                  onClick={() => setUploadMode('single')}
-                  className={`px-8 py-3 rounded-lg font-bold transition-all flex items-center gap-3 ${
-                    uploadMode === 'single'
-                      ? 'bg-gradient-to-b from-[#c9a227] to-[#8b7319] text-[#1a1612]'
-                      : 'text-[#9c8550] hover:text-[#c9a227]'
-                  }`}
-                >
-                  <span className="text-xl">🖼️</span>
-                  صور منفردة
-                </button>
-              </div>
-            </div>
-
-            <p className="text-center text-[#7a6540] mb-8 text-sm">
-              {uploadMode === 'collection' 
-                ? '💡 ارفع جميع صفحات المقال معاً ليتم معالجتها كمجموعة واحدة'
-                : '💡 ارفع صور منفردة - كل صورة تُعالج على حدة'
-              }
-            </p>
-
-            {/* Upload Component */}
-            <div className="vintage-card p-8 rounded-2xl corner-ornament">
-              {uploadMode === 'collection' ? (
-                <CollectionUpload />
-              ) : (
-                <UploadZone />
-              )}
-            </div>
-          </div>
-        </section>
 
         {/* How It Works */}
         <section className="py-16 px-6 bg-gradient-to-b from-transparent via-[#1a1612]/50 to-transparent">

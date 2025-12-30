@@ -234,7 +234,8 @@ export default function ChangeReviewModal({
     );
   }
 
-  const context = currentChange ? getContextText(currentChange.original, currentChange.position) : null;
+  const changeOriginalText = currentChange && 'original' in currentChange ? currentChange.original : (currentChange && 'text' in currentChange ? currentChange.text : '');
+  const context = currentChange ? getContextText(changeOriginalText, currentChange.position) : null;
   const typeInfo = currentChange ? TYPE_LABELS[currentChange.type] || TYPE_LABELS.formatting : null;
 
   return (
@@ -285,9 +286,11 @@ export default function ChangeReviewModal({
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${typeInfo.color}`}>
                 {typeInfo.ar} / {typeInfo.en}
               </span>
-              <span className="text-sm text-[#7a6545]">
-                الثقة: {Math.round(currentChange.confidence * 100)}%
-              </span>
+              {'confidence' in currentChange && (
+                <span className="text-sm text-[#7a6545]">
+                  الثقة: {Math.round(currentChange.confidence * 100)}%
+                </span>
+              )}
             </div>
 
             {/* Full context display - shows whole paragraph */}
@@ -324,7 +327,9 @@ export default function ChangeReviewModal({
                     lineHeight: '1.8',
                   }}
                 >
-                  {currentChange.original}
+                  {currentChange.changeType === 'correction' 
+                    ? (currentChange as AICorrection).original 
+                    : (currentChange as FormattingChange).text}
                 </div>
               </div>
               <div className="bg-[#2a4a2a]/50 rounded-xl p-4 border-2 border-[#4a8a4a]">

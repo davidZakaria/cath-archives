@@ -16,6 +16,34 @@ interface CollectionPage {
   aiCorrectedText?: string;
 }
 
+interface LinkedMovie {
+  _id: string;
+  arabicName: string;
+  englishName?: string;
+  year?: number;
+  genres?: string[];
+  description?: string;
+  directors?: string[];
+  posterImage?: string;
+  backdropImage?: string;
+  tmdbId?: number;
+  voteAverage?: number;
+  voteCount?: number;
+  runtime?: number;
+  tagline?: string;
+  originalLanguage?: string;
+  popularity?: number;
+}
+
+interface LinkedCharacter {
+  _id: string;
+  arabicName: string;
+  englishName?: string;
+  type: string;
+  photoImage?: string;
+  biography?: string;
+}
+
 interface Collection {
   _id: string;
   title: string;
@@ -38,8 +66,12 @@ interface Collection {
     publicationDate?: string;
     source?: string;
   };
+  linkedMovie?: LinkedMovie;
+  linkedCharacter?: LinkedCharacter;
+  linkType?: 'movie' | 'character';
   coverImagePath?: string;
   processingStatus: string;
+  status: string;
   ocrCompletedPages: number;
   createdAt: string;
 }
@@ -125,20 +157,183 @@ export default function CollectionViewPage({ params }: { params: Promise<{ id: s
     ? (collection.combinedAiText || collection.combinedOcrText || '')
     : (currentPageData?.aiCorrectedText || currentPageData?.ocrText || '');
 
+  const movie = collection.linkedMovie;
+  const character = collection.linkedCharacter;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white" dir="rtl">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4">
-            <Link href="/archive" className="text-amber-600 hover:text-amber-800 transition-colors">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-            </Link>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-bold text-amber-900 truncate">{collection.title}</h1>
-              <p className="text-sm text-amber-600">{collection.totalPages} صفحات</p>
+      {/* Movie/Character Hero Section */}
+      {(movie || character) && (
+        <div className="relative">
+          {/* Backdrop Image */}
+          {movie?.backdropImage && (
+            <div className="absolute inset-0 h-80 overflow-hidden">
+              <Image
+                src={movie.backdropImage}
+                alt=""
+                fill
+                className="object-cover"
+                priority
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-amber-50"></div>
+            </div>
+          )}
+          
+          <div className={`relative ${movie?.backdropImage ? 'pt-8' : 'pt-4 bg-gradient-to-r from-amber-900 to-amber-800'}`}>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+              {/* Back Button */}
+              <Link 
+                href="/archive" 
+                className={`inline-flex items-center gap-2 mb-6 ${movie?.backdropImage ? 'text-white' : 'text-amber-100'} hover:text-amber-200 transition-colors`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                <span>العودة للأرشيف</span>
+              </Link>
+              
+              <div className="flex flex-col md:flex-row gap-8">
+                {/* Poster / Photo */}
+                {(movie?.posterImage || character?.photoImage) && (
+                  <div className="flex-shrink-0">
+                    <div className="relative w-48 h-72 rounded-xl overflow-hidden shadow-2xl ring-4 ring-white/20">
+                      <Image
+                        src={movie?.posterImage || character?.photoImage || ''}
+                        alt={movie?.arabicName || character?.arabicName || ''}
+                        fill
+                        className="object-cover"
+                        priority
+                      />
+                    </div>
+                    
+                    {/* TMDB Rating Badge */}
+                    {movie?.voteAverage && movie.voteAverage > 0 && (
+                      <div className="mt-3 flex items-center justify-center gap-2 bg-black/50 rounded-lg py-2 px-3">
+                        <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                        <span className="text-white font-bold">{movie.voteAverage.toFixed(1)}</span>
+                        <span className="text-white/60 text-sm">({movie.voteCount?.toLocaleString()})</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Movie/Character Info */}
+                <div className="flex-1">
+                  {/* Title */}
+                  <h1 className={`text-3xl md:text-4xl font-bold ${movie?.backdropImage ? 'text-white' : 'text-white'} mb-2`}>
+                    {movie?.arabicName || character?.arabicName}
+                  </h1>
+                  
+                  {/* English Name & Year */}
+                  <div className={`flex flex-wrap items-center gap-3 mb-4 ${movie?.backdropImage ? 'text-white/80' : 'text-amber-100'}`}>
+                    {(movie?.englishName || character?.englishName) && (
+                      <span className="text-lg">{movie?.englishName || character?.englishName}</span>
+                    )}
+                    {movie?.year && (
+                      <>
+                        <span className="text-white/40">•</span>
+                        <span>{movie.year}</span>
+                      </>
+                    )}
+                    {movie?.runtime && (
+                      <>
+                        <span className="text-white/40">•</span>
+                        <span>{movie.runtime} دقيقة</span>
+                      </>
+                    )}
+                    {character?.type && (
+                      <>
+                        <span className="text-white/40">•</span>
+                        <span>{character.type}</span>
+                      </>
+                    )}
+                  </div>
+                  
+                  {/* Tagline */}
+                  {movie?.tagline && (
+                    <p className={`text-lg italic mb-4 ${movie?.backdropImage ? 'text-white/70' : 'text-amber-200'}`}>
+                      "{movie.tagline}"
+                    </p>
+                  )}
+                  
+                  {/* Genres */}
+                  {movie?.genres && movie.genres.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {movie.genres.map((genre, i) => (
+                        <span 
+                          key={i} 
+                          className="px-3 py-1 bg-white/20 text-white rounded-full text-sm backdrop-blur-sm"
+                        >
+                          {genre}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Directors */}
+                  {movie?.directors && movie.directors.length > 0 && (
+                    <div className={`mb-4 ${movie?.backdropImage ? 'text-white/80' : 'text-amber-100'}`}>
+                      <span className="font-semibold">إخراج: </span>
+                      {movie.directors.join('، ')}
+                    </div>
+                  )}
+                  
+                  {/* Description */}
+                  {(movie?.description || character?.biography) && (
+                    <p className={`text-base leading-relaxed ${movie?.backdropImage ? 'text-white/90' : 'text-amber-100'} max-w-3xl`}>
+                      {movie?.description || character?.biography}
+                    </p>
+                  )}
+                  
+                  {/* TMDB Badge */}
+                  {movie?.tmdbId && (
+                    <a 
+                      href={`https://www.themoviedb.org/movie/${movie.tmdbId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 mt-4 px-3 py-1.5 bg-[#01b4e4]/20 text-[#01b4e4] rounded-lg text-sm hover:bg-[#01b4e4]/30 transition-colors"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                      </svg>
+                      <span>عرض في TMDB</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archive Header (if no movie/character linked) */}
+      {!movie && !character && (
+        <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-40">
+          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-4">
+              <Link href="/archive" className="text-amber-600 hover:text-amber-800 transition-colors">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+              </Link>
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl font-bold text-amber-900 truncate">{collection.title}</h1>
+                <p className="text-sm text-amber-600">{collection.totalPages} صفحات</p>
+              </div>
+            </div>
+          </div>
+        </header>
+      )}
+
+      {/* Article Title Card */}
+      <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">{collection.title}</h2>
+              <p className="text-gray-500 mt-1">{collection.totalPages} صفحات • {new Date(collection.createdAt).toLocaleDateString('ar-EG')}</p>
             </div>
             
             {/* AI Process Button */}
@@ -164,28 +359,22 @@ export default function CollectionViewPage({ params }: { params: Promise<{ id: s
               </button>
             )}
           </div>
-        </div>
-      </header>
-
-      {/* Metadata Tags */}
-      {collection.metadata && (collection.metadata.movies?.length || collection.metadata.characters?.length) && (
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap gap-2">
-            {collection.metadata.movies?.map((movie, i) => (
-              <span key={`movie-${i}`} className="px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-sm">
-                🎬 {movie}
+          
+          {/* Status Badge */}
+          <div className="mt-4 flex items-center gap-2">
+            {collection.status === 'published' && (
+              <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                منشور
               </span>
-            ))}
-            {collection.metadata.characters?.map((char, i) => (
-              <span key={`char-${i}`} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                👤 {char}
+            )}
+            {collection.combinedAiText && (
+              <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
+                معالج بالذكاء الاصطناعي
               </span>
-            ))}
+            )}
           </div>
         </div>
-      )}
 
-      <main className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
         {/* View Mode Toggle */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2 bg-white rounded-lg border border-amber-200 p-1">
@@ -374,7 +563,7 @@ export default function CollectionViewPage({ params }: { params: Promise<{ id: s
             </div>
           </div>
         )}
-      </main>
+      </div>
 
       {/* Zoomed Image Modal */}
       {zoomedImage && (

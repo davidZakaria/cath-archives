@@ -134,7 +134,7 @@ export default function FormattingGuidePage() {
           <h2 className="text-xl font-bold mb-4 text-yellow-800">📝 Editing Tips</h2>
           <ul className="space-y-2 text-gray-800">
             <li>• You can edit the formatted text freely in the editor</li>
-            <li>• The formatting markers (#, ##, >, •) are just visual guides</li>
+            <li>• The formatting markers (#, ##, {'>'},  •) are just visual guides</li>
             <li>• Remove or add formatting markers as needed</li>
             <li>• The original unformatted text is always available (click "Show Original OCR")</li>
             <li>• Formatting is applied automatically on every new upload</li>

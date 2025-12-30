@@ -584,6 +584,17 @@ export async function detectTextCorrections(
   const confidenceThreshold = options.confidenceThreshold ?? 0.99; // Very high threshold - only flag obvious OCR garbage
   const modelConfig = AI_MODELS[model];
   
+  // Limit text length to avoid response truncation (roughly 20k chars = ~5k tokens)
+  const MAX_TEXT_LENGTH = 20000;
+  let processedText = ocrText;
+  let wasTextTruncated = false;
+  
+  if (ocrText.length > MAX_TEXT_LENGTH) {
+    console.log(`[Text Correction] Text too long (${ocrText.length} chars), truncating to ${MAX_TEXT_LENGTH}`);
+    processedText = ocrText.substring(0, MAX_TEXT_LENGTH);
+    wasTextTruncated = true;
+  }
+  
   try {
     const response = await client.chat.completions.create({
       model: model,
@@ -644,12 +655,12 @@ Return JSON:
 }
 
 Classical Arabic text to analyze:
-${ocrText}`,
+${processedText}`,
         },
       ],
       response_format: { type: 'json_object' },
       temperature: 0.1, // Very low temperature for consistent, accurate results
-      max_tokens: 8000,
+      max_tokens: 16000, // Increased to handle longer responses
     });
 
     const inputTokens = response.usage?.prompt_tokens || 0;
@@ -658,7 +669,7 @@ ${ocrText}`,
       (inputTokens / 1000000) * modelConfig.inputCostPer1M +
       (outputTokens / 1000000) * modelConfig.outputCostPer1M;
 
-    console.log(`[Text Correction Detection] Model: ${model}, Cost: $${cost.toFixed(6)}`);
+    console.log(`[Text Correction Detection] Model: ${model}, Cost: $${cost.toFixed(6)}${wasTextTruncated ? ' (text was truncated)' : ''}`);
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
@@ -679,15 +690,29 @@ ${ocrText}`,
       result = JSON.parse(content);
     } catch (parseError) {
       console.error('JSON parse error, attempting to fix truncated response:', parseError);
+      
       // Try to fix common JSON truncation issues
       let fixedContent = content;
-      // Close any unclosed arrays and objects
+      
+      // Step 1: Remove any incomplete string at the end (truncated mid-string)
+      // Find the last complete key-value pair
+      const lastCompleteObjectMatch = fixedContent.match(/^([\s\S]*"[^"]*"\s*:\s*(?:"[^"]*"|[\d.]+|true|false|null|\[[^\]]*\]|\{[^}]*\}))\s*,?\s*"[^"]*"?\s*:?\s*"?[^"]*$/);
+      if (lastCompleteObjectMatch) {
+        fixedContent = lastCompleteObjectMatch[1];
+      }
+      
+      // Step 2: Remove trailing incomplete content after last complete structure
+      // Remove any trailing partial strings or values
+      fixedContent = fixedContent.replace(/,\s*"[^"]*"?\s*:?\s*"?[^"{}[\]]*$/, '');
+      fixedContent = fixedContent.replace(/,\s*$/, ''); // Remove trailing commas
+      
+      // Step 3: Close any unclosed arrays and objects
       const openBrackets = (fixedContent.match(/\[/g) || []).length;
       const closeBrackets = (fixedContent.match(/\]/g) || []).length;
       const openBraces = (fixedContent.match(/\{/g) || []).length;
       const closeBraces = (fixedContent.match(/\}/g) || []).length;
       
-      // Add missing closing brackets
+      // Add missing closing brackets (arrays first, then objects)
       for (let i = 0; i < openBrackets - closeBrackets; i++) {
         fixedContent += ']';
       }
@@ -697,18 +722,33 @@ ${ocrText}`,
       
       try {
         result = JSON.parse(fixedContent);
-      } catch {
-        // If still fails, return empty result
-        console.error('Could not parse AI response even after fix attempt');
-        return {
-          corrections: [],
-          formattingChanges: [],
-          correctedText: ocrText,
-          totalCorrections: 0,
-          confidence: 0,
-          cost,
-          modelUsed: model,
-        };
+        console.log('Successfully recovered truncated JSON response');
+      } catch (secondError) {
+        // Step 4: Last resort - try to extract just the corrections array
+        console.error('Standard fix failed, trying to extract partial data...');
+        try {
+          // Try to find and parse just the corrections array
+          const correctionsMatch = fixedContent.match(/"corrections"\s*:\s*\[([\s\S]*?)\]/);
+          if (correctionsMatch) {
+            const partialCorrections = JSON.parse(`[${correctionsMatch[1]}]`.replace(/,\s*$/, ''));
+            result = { corrections: partialCorrections, formattingChanges: [], correctedText: ocrText, confidence: 0.5 };
+            console.log('Recovered partial corrections from truncated response');
+          } else {
+            throw secondError;
+          }
+        } catch {
+          // If still fails, return empty result
+          console.error('Could not parse AI response even after all fix attempts');
+          return {
+            corrections: [],
+            formattingChanges: [],
+            correctedText: ocrText,
+            totalCorrections: 0,
+            confidence: 0,
+            cost,
+            modelUsed: model,
+          };
+        }
       }
     }
     

@@ -136,7 +136,7 @@ export async function performOCR(imagePath: string): Promise<OCRResult> {
     const avgConfidence = confidenceCount > 0 ? totalConfidence / confidenceCount : 0;
 
     // Apply intelligent formatting to the text
-    const formattedText = formatOCRText(blocks, text);
+    const formattedText = formatOCRTextAdvanced(blocks, text);
 
     return {
       text: formattedText, // Use formatted text with structure

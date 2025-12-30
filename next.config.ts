@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: '**.wikipedia.org',
       },
+      {
+        protocol: 'https',
+        hostname: 'image.tmdb.org',
+      },
     ],
   },
   // Allow server-side API calls to work properly
