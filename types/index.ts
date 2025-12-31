@@ -73,7 +73,7 @@ export interface ArticleMetadata {
 export type CorrectionType = 'ocr_error' | 'spelling' | 'formatting';
 
 // Status of a correction in the review workflow
-export type CorrectionStatus = 'pending' | 'approved' | 'rejected';
+export type CorrectionStatus = 'pending' | 'approved' | 'rejected' | 'deleted';
 
 // Individual AI-detected correction
 export interface AICorrection {

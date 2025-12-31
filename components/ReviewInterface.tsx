@@ -55,6 +55,7 @@ export default function ReviewInterface({ document }: ReviewInterfaceProps) {
                         formattingChanges.filter(f => f.status === 'approved').length;
   const rejectedCount = corrections.filter(c => c.status === 'rejected').length + 
                         formattingChanges.filter(f => f.status === 'rejected').length;
+  const deletedCount = corrections.filter(c => c.status === 'deleted').length;
   const pendingCount = corrections.filter(c => c.status === 'pending').length + 
                        formattingChanges.filter(f => f.status === 'pending').length;
 
@@ -178,13 +179,25 @@ export default function ReviewInterface({ document }: ReviewInterfaceProps) {
   }, []);
 
   const applyApprovedCorrections = useCallback(() => {
+    // Get approved and deleted corrections (both need to be applied)
     const approved = corrections.filter(c => c.status === 'approved').sort((a, b) => b.position.start - a.position.start);
+    const deleted = corrections.filter(c => c.status === 'deleted').sort((a, b) => b.position.start - a.position.start);
+    
+    // Combine and sort by position (end to start) to avoid position shifts
+    const allChanges = [...approved, ...deleted].sort((a, b) => b.position.start - a.position.start);
+    
     let result = verifiedText;
-    for (const correction of approved) {
-      result = result.slice(0, correction.position.start) + correction.corrected + result.slice(correction.position.end);
+    for (const correction of allChanges) {
+      if (correction.status === 'deleted') {
+        // Delete: remove text completely
+        result = result.slice(0, correction.position.start) + result.slice(correction.position.end);
+      } else {
+        // Approve: apply correction
+        result = result.slice(0, correction.position.start) + correction.corrected + result.slice(correction.position.end);
+      }
     }
     setVerifiedText(result);
-    setCorrectionsCount(prev => prev + approved.length);
+    setCorrectionsCount(prev => prev + approved.length + deleted.length);
     setShowChangeReviewModal(false);
     setShowPreview(true);
   }, [corrections, verifiedText]);
@@ -281,6 +294,12 @@ export default function ReviewInterface({ document }: ReviewInterfaceProps) {
                   <span className="text-[#90ee90]">✓{approvedCount}</span>
                   <span className="text-[#5c4108]">|</span>
                   <span className="text-[#ff6b6b]">✗{rejectedCount}</span>
+                  {deletedCount > 0 && (
+                    <>
+                      <span className="text-[#5c4108]">|</span>
+                      <span className="text-[#cc8888]">🗑️{deletedCount}</span>
+                    </>
+                  )}
                   {pendingCount > 0 && (
                     <>
                       <span className="text-[#5c4108]">|</span>

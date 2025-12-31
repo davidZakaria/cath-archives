@@ -89,7 +89,10 @@ export async function POST(request: NextRequest) {
 async function performOCR(documentId: string, imageBuffer: Buffer) {
   try {
     // Perform OCR using Google Cloud Vision
-    const ocrResult = await performOCRFromBuffer(imageBuffer);
+    // DISABLE column splitting - process full image and sort blocks by position
+    const ocrResult = await performOCRFromBuffer(imageBuffer, {
+      processColumns: false // Disable column splitting, use position-based sorting instead
+    });
 
     // Update document with OCR results
     await connectDB();

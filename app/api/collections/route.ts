@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
     const title = formData.get('title') as string || 'مجموعة جديدة';
-    
+
     // Get linked entity info
     const linkType = formData.get('linkType') as string | null;
     const linkedMovie = formData.get('linkedMovie') as string | null;
@@ -64,10 +64,10 @@ export async function POST(request: NextRequest) {
 
     // Process each file as a page
     const pages = [];
-    
+
     for (let i = 0; i < imageFiles.length; i++) {
       const file = imageFiles[i];
-      
+
       try {
         // Convert file to buffer
         const bytes = await file.arrayBuffer();
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
           maxWidth: 3000,
           maxHeight: 4000,
         });
-        
+
         const buffer = compression.buffer;
         console.log(`[Compression] Page ${i + 1} - ${file.name}: ${formatBytes(compression.originalSize)} → ${formatBytes(compression.compressedSize)} (${compression.compressionRatio.toFixed(2)}x)`);
 
@@ -98,11 +98,11 @@ export async function POST(request: NextRequest) {
         const timestamp = Date.now();
         const safeFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_').replace(/\.[^.]+$/, '.jpg');
         const filename = `${collection._id}_page${i + 1}_${timestamp}_${safeFilename}`;
-        
+
         // Create collection subfolder
         const collectionDir = join(process.cwd(), 'public', 'uploads', 'collections', collection._id.toString());
         await mkdir(collectionDir, { recursive: true });
-        
+
         const filepath = join(collectionDir, filename);
         await writeFile(filepath, buffer);
 
@@ -146,14 +146,14 @@ export async function POST(request: NextRequest) {
 
     // Auto-enrich linked movie with TMDB data (in background)
     if (linkType === 'movie' && linkedMovie) {
-      enrichMovieWithTMDB(linkedMovie).catch(err => 
+      enrichMovieWithTMDB(linkedMovie).catch(err =>
         console.error('Background TMDB movie enrichment failed:', err)
       );
     }
-    
+
     // Auto-enrich linked character with TMDB data (in background)
     if (linkType === 'character' && linkedCharacter) {
-      enrichCharacterWithTMDB(linkedCharacter).catch(err => 
+      enrichCharacterWithTMDB(linkedCharacter).catch(err =>
         console.error('Background TMDB character enrichment failed:', err)
       );
     }
@@ -187,8 +187,8 @@ async function processPageOCR(
     // Preprocess image for better OCR accuracy (Arabic-optimized)
     const preprocessed = await preprocessArabicDocument(imageBuffer);
     console.log(`[Preprocessing] Page ${pageNumber}: Applied ${preprocessed.appliedOperations.join(', ')}`);
-    
-    const ocrResult = await performOCRFromBuffer(preprocessed.buffer);
+
+    const ocrResult = await performOCRFromBuffer(preprocessed.buffer, { processColumns: false });
 
     await connectDB();
 
@@ -227,11 +227,11 @@ async function processPageOCR(
       const pageConfidences = collection.pages
         .map(p => p.ocrConfidence || 0)
         .filter(c => c > 0);
-      
+
       const avgConfidence = pageConfidences.length > 0
         ? pageConfidences.reduce((a, b) => a + b, 0) / pageConfidences.length
         : 0;
-      
+
       // Collect all detected titles from pages
       const allTitles = collection.pages
         .flatMap(p => p.detectedTitles || [])
@@ -273,22 +273,22 @@ export async function GET(request: NextRequest) {
     await connectDB();
 
     const query: Record<string, unknown> = {};
-    
+
     // Filter by processing status
     if (processingStatus && processingStatus !== 'all') {
       query.processingStatus = processingStatus;
     }
-    
+
     // Filter by publication status
     if (publicationStatus && publicationStatus !== 'all') {
       query.status = publicationStatus;
     }
-    
+
     // Filter by linked movie
     if (linkedMovie) {
       query.linkedMovie = linkedMovie;
     }
-    
+
     // Filter by linked character
     if (linkedCharacter) {
       query.linkedCharacter = linkedCharacter;
@@ -328,7 +328,7 @@ export async function GET(request: NextRequest) {
 async function enrichMovieWithTMDB(movieId: string) {
   try {
     await connectDB();
-    
+
     const movie = await Movie.findById(movieId);
     if (!movie) {
       console.log(`Movie ${movieId} not found for TMDB enrichment`);
@@ -345,13 +345,13 @@ async function enrichMovieWithTMDB(movieId: string) {
 
     // Search TMDB by Arabic name first, then English name
     let tmdbMovie = null;
-    
+
     // Try Arabic name search
     const arabicResults = await searchMovies(movie.arabicName, {
       year: movie.year,
       language: 'ar-EG',
     });
-    
+
     if (arabicResults.results.length > 0) {
       // Find best match (same year if available)
       tmdbMovie = arabicResults.results.find(m => {
@@ -366,7 +366,7 @@ async function enrichMovieWithTMDB(movieId: string) {
         year: movie.year,
         language: 'en-US',
       });
-      
+
       if (englishResults.results.length > 0) {
         tmdbMovie = englishResults.results.find(m => {
           const tmdbYear = m.release_date ? parseInt(m.release_date.split('-')[0]) : null;
@@ -413,7 +413,7 @@ async function enrichMovieWithTMDB(movieId: string) {
 async function enrichCharacterWithTMDB(characterId: string) {
   try {
     await connectDB();
-    
+
     const character = await Character.findById(characterId);
     if (!character) {
       console.log(`Character ${characterId} not found for TMDB enrichment`);

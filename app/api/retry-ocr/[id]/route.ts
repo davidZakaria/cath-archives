@@ -10,9 +10,23 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  return await handleRetryOCR(request, params);
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  return await handleRetryOCR(request, params);
+}
+
+async function handleRetryOCR(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const { id } = await params;
-    
+
     // Validate ObjectId format
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -20,7 +34,7 @@ export async function GET(
         { status: 400 }
       );
     }
-    
+
     await connectDB();
 
     // Get the document
@@ -38,7 +52,7 @@ export async function GET(
 
     // Perform OCR using Google Cloud Vision
     console.log(`Starting Google Cloud Vision OCR for document ${id}...`);
-    const ocrResult = await performOCRFromBuffer(imageBuffer);
+    const ocrResult = await performOCRFromBuffer(imageBuffer, { processColumns: false });
 
     // Update document
     await Document.findByIdAndUpdate(id, {
@@ -63,10 +77,10 @@ export async function GET(
   } catch (error: any) {
     console.error('OCR retry failed:', error);
     return NextResponse.json(
-      { 
-        error: 'OCR processing failed', 
+      {
+        error: 'OCR processing failed',
         details: error.message,
-        stack: error.stack 
+        stack: error.stack
       },
       { status: 500 }
     );

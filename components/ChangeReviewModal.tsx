@@ -50,6 +50,7 @@ export default function ChangeReviewModal({
   const reviewedChanges = allChanges.filter(c => c.status !== 'pending').length;
   const approvedChanges = allChanges.filter(c => c.status === 'approved').length;
   const rejectedChanges = allChanges.filter(c => c.status === 'rejected').length;
+  const deletedChanges = allChanges.filter(c => c.status === 'deleted').length;
 
   // Reset index when changes update
   useEffect(() => {
@@ -60,28 +61,69 @@ export default function ChangeReviewModal({
 
   // Get full context around the change - finds the actual original word in text
   const getContextText = useCallback((originalWord: string, position: { start: number; end: number }) => {
-    // First, try to find the actual original word in the text
-    // Search near the position first, then expand if not found
-    let actualStart = -1;
-    let actualEnd = -1;
+    // First, check if the word at the given position matches
+    const textAtPosition = originalText.slice(position.start, position.end).trim();
     
-    // Search in a window around the position
-    const searchStart = Math.max(0, position.start - 500);
-    const searchEnd = Math.min(originalText.length, position.end + 500);
-    const searchArea = originalText.slice(searchStart, searchEnd);
+    let actualStart = position.start;
+    let actualEnd = position.end;
+    let wordFound = false;
     
-    const wordIndex = searchArea.indexOf(originalWord);
-    if (wordIndex !== -1) {
-      actualStart = searchStart + wordIndex;
-      actualEnd = actualStart + originalWord.length;
+    // If word matches at position, use it
+    if (textAtPosition === originalWord.trim() || 
+        textAtPosition.includes(originalWord.trim()) ||
+        originalWord.trim().includes(textAtPosition)) {
+      wordFound = true;
+      // Adjust to exact boundaries
+      const trimmedWord = originalWord.trim();
+      if (textAtPosition !== trimmedWord) {
+        // Find exact match within the position range
+        const exactIndex = textAtPosition.indexOf(trimmedWord);
+        if (exactIndex !== -1) {
+          actualStart = position.start + exactIndex;
+          actualEnd = actualStart + trimmedWord.length;
+        }
+      }
     } else {
-      // If not found near position, search entire text
-      const fullIndex = originalText.indexOf(originalWord);
-      if (fullIndex !== -1) {
-        actualStart = fullIndex;
-        actualEnd = actualStart + originalWord.length;
+      // Word doesn't match at position, search for it
+      // Search in a window around the position first
+      const searchStart = Math.max(0, position.start - 500);
+      const searchEnd = Math.min(originalText.length, position.end + 500);
+      const searchArea = originalText.slice(searchStart, searchEnd);
+      
+      const trimmedWord = originalWord.trim();
+      let wordIndex = searchArea.indexOf(trimmedWord);
+      
+      if (wordIndex !== -1) {
+        actualStart = searchStart + wordIndex;
+        actualEnd = actualStart + trimmedWord.length;
+        wordFound = true;
       } else {
-        // Fallback to position-based if word not found
+        // Try case-insensitive for emails/URLs
+        if (trimmedWord.includes('@') || trimmedWord.includes('www.') || trimmedWord.includes('http')) {
+          const lowerWord = trimmedWord.toLowerCase();
+          const lowerSearchArea = searchArea.toLowerCase();
+          wordIndex = lowerSearchArea.indexOf(lowerWord);
+          if (wordIndex !== -1) {
+            actualStart = searchStart + wordIndex;
+            actualEnd = actualStart + trimmedWord.length;
+            wordFound = true;
+          }
+        }
+        
+        // If still not found, search entire text
+        if (!wordFound) {
+          const fullIndex = originalText.indexOf(trimmedWord);
+          if (fullIndex !== -1) {
+            actualStart = fullIndex;
+            actualEnd = actualStart + trimmedWord.length;
+            wordFound = true;
+          }
+        }
+      }
+      
+      // If word still not found, use the position but show what's actually there
+      if (!wordFound) {
+        // Use position but note the mismatch
         actualStart = position.start;
         actualEnd = position.end;
       }
@@ -156,6 +198,18 @@ export default function ChangeReviewModal({
     }
   }, [currentChange, onUpdateCorrection, onUpdateFormatting]);
 
+  const handleDelete = useCallback(() => {
+    if (!currentChange) return;
+    
+    // Delete removes text completely (sets corrected to empty string)
+    if (currentChange.changeType === 'correction') {
+      onUpdateCorrection(currentChange.id, 'deleted');
+    } else {
+      // For formatting changes, deletion means reject (keep original)
+      onUpdateFormatting(currentChange.id, 'rejected');
+    }
+  }, [currentChange, onUpdateCorrection, onUpdateFormatting]);
+
   const handleSkip = useCallback(() => {
     if (currentIndex < pendingChanges.length - 1) {
       setCurrentIndex(prev => prev + 1);
@@ -181,6 +235,9 @@ export default function ChangeReviewModal({
       } else if (e.key === 'r' || e.key === 'R' || e.key === 'Backspace') {
         e.preventDefault();
         handleReject();
+      } else if (e.key === 'd' || e.key === 'D' || e.key === 'Delete') {
+        e.preventDefault();
+        handleDelete();
       } else if (e.key === 's' || e.key === 'S' || e.key === 'ArrowRight') {
         e.preventDefault();
         handleSkip();
@@ -194,7 +251,7 @@ export default function ChangeReviewModal({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, handleApprove, handleReject, handleSkip, handlePrevious, onClose]);
+  }, [isOpen, handleApprove, handleReject, handleDelete, handleSkip, handlePrevious, onClose]);
 
   if (!isOpen) return null;
 
@@ -205,7 +262,7 @@ export default function ChangeReviewModal({
         <div className="vintage-card rounded-2xl shadow-2xl max-w-lg w-full mx-4 p-8 text-center">
           <div className="text-6xl mb-4">✅</div>
           <h2 className="text-2xl font-bold text-[#d4a012] mb-4">اكتملت المراجعة!</h2>
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="bg-[#2a4a2a]/50 rounded-lg p-4 border border-[#4a8a4a]">
               <div className="text-3xl font-bold text-[#90ee90]">{approvedChanges}</div>
               <div className="text-sm text-[#90ee90]/80">موافق عليها</div>
@@ -213,6 +270,10 @@ export default function ChangeReviewModal({
             <div className="bg-[#4a2020]/50 rounded-lg p-4 border border-[#8a4040]">
               <div className="text-3xl font-bold text-[#ff6b6b]">{rejectedChanges}</div>
               <div className="text-sm text-[#ff6b6b]/80">مرفوضة</div>
+            </div>
+            <div className="bg-[#3a2a2a]/50 rounded-lg p-4 border border-[#6a4040]">
+              <div className="text-3xl font-bold text-[#cc8888]">{deletedChanges}</div>
+              <div className="text-sm text-[#cc8888]/80">محذوفة</div>
             </div>
           </div>
           <div className="flex gap-3">
@@ -274,24 +335,40 @@ export default function ChangeReviewModal({
             <div className="flex gap-4 text-xs">
               <span className="text-[#90ee90]">✓ {approvedChanges} موافق</span>
               <span className="text-[#ff6b6b]">✗ {rejectedChanges} مرفوض</span>
+              <span className="text-[#cc8888]">🗑️ {deletedChanges} محذوف</span>
             </div>
           </div>
         </div>
 
         {/* Content */}
-        {currentChange && context && typeInfo && (
-          <div className="flex-1 overflow-y-auto p-6 bg-[#1a1510]">
-            {/* Change type badge */}
-            <div className="flex items-center gap-3 mb-4">
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${typeInfo.color}`}>
-                {typeInfo.ar} / {typeInfo.en}
-              </span>
-              {'confidence' in currentChange && (
-                <span className="text-sm text-[#7a6545]">
-                  الثقة: {Math.round(currentChange.confidence * 100)}%
+        {currentChange && context && typeInfo && (() => {
+          // Check if word at position matches what AI detected
+          const textAtPosition = originalText.slice(currentChange.position.start, currentChange.position.end).trim();
+          const detectedWord = currentChange.changeType === 'correction' 
+            ? (currentChange as AICorrection).original 
+            : (currentChange as FormattingChange).text;
+          const positionMatches = textAtPosition === detectedWord.trim() || 
+                                 textAtPosition.includes(detectedWord.trim()) ||
+                                 detectedWord.trim().includes(textAtPosition);
+          
+          return (
+            <div className="flex-1 overflow-y-auto p-6 bg-[#1a1510]">
+              {/* Change type badge */}
+              <div className="flex items-center gap-3 mb-4">
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${typeInfo.color}`}>
+                  {typeInfo.ar} / {typeInfo.en}
                 </span>
-              )}
-            </div>
+                {'confidence' in currentChange && (
+                  <span className="text-sm text-[#7a6545]">
+                    الثقة: {Math.round(currentChange.confidence * 100)}%
+                  </span>
+                )}
+                {!positionMatches && (
+                  <span className="px-2 py-1 rounded text-xs font-medium bg-[#4a2020] text-[#ff9999] border border-[#6a3030]">
+                    ⚠️ موضع غير متطابق
+                  </span>
+                )}
+              </div>
 
             {/* Full context display - shows whole paragraph */}
             <div className="bg-[#2a2318] rounded-xl p-4 mb-4 font-arabic text-right border-2 border-[#3a3020] max-h-[25vh] overflow-y-auto" dir="rtl">
@@ -327,9 +404,28 @@ export default function ChangeReviewModal({
                     lineHeight: '1.8',
                   }}
                 >
-                  {currentChange.changeType === 'correction' 
-                    ? (currentChange as AICorrection).original 
-                    : (currentChange as FormattingChange).text}
+                  {/* Show actual text at position if it differs from AI's detection */}
+                  {(() => {
+                    if (currentChange.changeType === 'correction') {
+                      const correction = currentChange as AICorrection;
+                      const actualTextAtPosition = originalText.slice(correction.position.start, correction.position.end).trim();
+                      const aiDetected = correction.original;
+                      
+                      // If actual text differs, show both
+                      if (actualTextAtPosition !== aiDetected && actualTextAtPosition.length > 0) {
+                        return (
+                          <div>
+                            <div className="text-[#ff6666] mb-2">ما اكتشفه الذكاء الاصطناعي:</div>
+                            <div className="text-[#ff9999]">{aiDetected}</div>
+                            <div className="text-[#ffaa66] mt-3 mb-2 border-t border-[#6a3030] pt-2">النص الفعلي في هذا الموضع:</div>
+                            <div className="text-[#ff8888]">{actualTextAtPosition || '(فارغ)'}</div>
+                          </div>
+                        );
+                      }
+                      return aiDetected;
+                    }
+                    return (currentChange as FormattingChange).text;
+                  })()}
                 </div>
               </div>
               <div className="bg-[#2a4a2a]/50 rounded-xl p-4 border-2 border-[#4a8a4a]">
@@ -343,9 +439,25 @@ export default function ChangeReviewModal({
                     lineHeight: '1.8',
                   }}
                 >
-                  {currentChange.changeType === 'correction' 
-                    ? (currentChange as AICorrection).corrected 
-                    : (currentChange as FormattingChange).suggestion}
+                  {(() => {
+                    if (currentChange.changeType === 'correction') {
+                      const correction = currentChange as AICorrection;
+                      const corrected = correction.corrected.trim();
+                      
+                      // If correction is empty (for deletion), show indication
+                      if (corrected === '') {
+                        return <span className="text-[#99cc99] italic">(سيتم حذف النص)</span>;
+                      }
+                      
+                      // If correction seems wrong, show it but indicate it might need review
+                      if (corrected.length === 0 || corrected === correction.original) {
+                        return <span className="text-[#ffcc99]">(لا يوجد تصحيح مقترح)</span>;
+                      }
+                      
+                      return corrected;
+                    }
+                    return (currentChange as FormattingChange).suggestion;
+                  })()}
                 </div>
               </div>
             </div>
@@ -360,7 +472,8 @@ export default function ChangeReviewModal({
               </div>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* Actions */}
         <div className="p-6 border-t border-[#3a3020] bg-[#2a2318] rounded-b-2xl">
@@ -375,10 +488,17 @@ export default function ChangeReviewModal({
             </button>
             <button
               onClick={handleReject}
-              className="flex-1 px-6 py-3 bg-[#4a2020] text-[#ff6b6b] rounded-lg font-bold hover:bg-[#5a3030] transition-colors border border-[#6a3030]"
+              className="px-6 py-3 bg-[#4a2020] text-[#ff6b6b] rounded-lg font-bold hover:bg-[#5a3030] transition-colors border border-[#6a3030]"
               title="رفض (R)"
             >
               ✗ رفض
+            </button>
+            <button
+              onClick={handleDelete}
+              className="px-6 py-3 bg-[#3a2a2a] text-[#cc8888] rounded-lg font-bold hover:bg-[#4a3a3a] transition-colors border border-[#6a4040]"
+              title="حذف (D)"
+            >
+              🗑️ حذف
             </button>
             <button
               onClick={handleSkip}
@@ -396,7 +516,7 @@ export default function ChangeReviewModal({
             </button>
           </div>
           <div className="text-center text-xs text-[#5c4108] mt-3">
-            A/Enter = موافق | R = رفض | S = تخطي | ← = السابق | Esc = إغلاق
+            A/Enter = موافق | R = رفض | D = حذف | S = تخطي | ← = السابق | Esc = إغلاق
           </div>
         </div>
       </div>

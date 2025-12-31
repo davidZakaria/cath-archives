@@ -14,8 +14,15 @@ export function formatOCRText(blocks: OCRBlock[], fullText: string): string {
     return fullText;
   }
 
-  // Sort blocks by vertical position (top to bottom)
-  const sortedBlocks = [...blocks].sort((a, b) => a.boundingBox.y - b.boundingBox.y);
+  // Sort blocks by vertical position (top to bottom), then right to left for Arabic
+  const sortedBlocks = [...blocks].sort((a, b) => {
+    const yDiff = a.boundingBox.y - b.boundingBox.y;
+    if (Math.abs(yDiff) < 20) { // Same line threshold
+      // For Arabic RTL: sort by X position (right to left - higher X first)
+      return b.boundingBox.x - a.boundingBox.x;
+    }
+    return yDiff; // Top to bottom
+  });
 
   // Analyze blocks and determine their type
   const sections: FormattedSection[] = [];
@@ -37,19 +44,26 @@ export function formatOCRText(blocks: OCRBlock[], fullText: string): string {
 }
 
 // Advanced formatting using font-size detection
-export function formatOCRTextAdvanced(blocks: OCRBlock[], fullText: string): string {
+export function formatOCRTextAdvanced(blocks: OCRBlock[], fullText: string, imageWidth?: number, numColumns?: number): string {
   if (!blocks || blocks.length === 0) {
     return fullText;
   }
-
-  // Sort blocks by vertical position (top to bottom), then left to right
+  
+  // Ensure blocks are sorted top-to-bottom before processing
+  // This is critical for correct reading order and title detection
   const sortedBlocks = [...blocks].sort((a, b) => {
     const yDiff = a.boundingBox.y - b.boundingBox.y;
-    if (Math.abs(yDiff) < 20) { // Same line threshold
-      return a.boundingBox.x - b.boundingBox.x; // Sort by x if on same line
+    if (Math.abs(yDiff) < 20) {
+      // Same line: sort by X (right to left for Arabic)
+      return b.boundingBox.x - a.boundingBox.x;
     }
-    return yDiff;
+    return yDiff; // Top to bottom
   });
+
+  // If columns are detected, arrange blocks by column first
+  if (numColumns && numColumns > 1 && imageWidth) {
+    return formatOCRTextWithColumns(sortedBlocks, fullText, imageWidth, numColumns);
+  }
 
   // Group blocks into lines (blocks on same horizontal level)
   const lines = groupBlocksIntoLines(sortedBlocks);
@@ -78,6 +92,70 @@ export function formatOCRTextAdvanced(blocks: OCRBlock[], fullText: string): str
   }
 
   return formatSectionsAdvanced(sections);
+}
+
+/**
+ * Format OCR text with column awareness - arranges columns sequentially (right-to-left for Arabic)
+ * Simply concatenates columns without adding formatting or separators
+ */
+function formatOCRTextWithColumns(
+  blocks: OCRBlock[], 
+  fullText: string, 
+  imageWidth: number, 
+  numColumns: number
+): string {
+  const columnWidth = imageWidth / numColumns;
+  const columns: { columnIndex: number; blocks: OCRBlock[] }[] = [];
+  
+  // Initialize column arrays (right-to-left for Arabic: column 0 is rightmost)
+  for (let i = 0; i < numColumns; i++) {
+    columns.push({ columnIndex: i, blocks: [] });
+  }
+  
+  // Assign each block to its column based on X position
+  for (const block of blocks) {
+    const blockCenterX = block.boundingBox.x + block.boundingBox.width / 2;
+    // Calculate which column (0 = rightmost, numColumns-1 = leftmost for Arabic)
+    const columnIndex = Math.min(
+      numColumns - 1,
+      Math.floor((imageWidth - blockCenterX) / columnWidth)
+    );
+    
+    // Ensure column index is valid (handle edge cases)
+    const validColumnIndex = Math.max(0, Math.min(numColumns - 1, columnIndex));
+    columns[validColumnIndex].blocks.push(block);
+  }
+  
+  // Process each column (right-to-left for Arabic reading order: column 0 = rightmost = first)
+  const columnTexts: string[] = [];
+  
+  for (let colIdx = 0; colIdx < numColumns; colIdx++) {
+    const column = columns[colIdx];
+    
+    // Sort blocks within column by vertical position (top to bottom), then by X (right to left within column)
+    const sortedColumnBlocks = [...column.blocks].sort((a, b) => {
+      const yDiff = a.boundingBox.y - b.boundingBox.y;
+      if (Math.abs(yDiff) < 20) {
+        // Same line: sort by X position (right to left for Arabic)
+        return b.boundingBox.x - a.boundingBox.x; // Reverse for RTL
+      }
+      return yDiff;
+    });
+    
+    // Simply concatenate block texts in order (no formatting, no separators)
+    const columnText = sortedColumnBlocks
+      .map(block => block.text.trim())
+      .filter(text => text.length > 0)
+      .join(' '); // Simple space join, no extra formatting
+    
+    if (columnText.trim().length > 0) {
+      columnTexts.push(columnText.trim());
+    }
+  }
+  
+  // Combine columns sequentially (rightmost first, then leftward)
+  // Just join with double newline - no separators, no formatting
+  return columnTexts.join('\n\n');
 }
 
 // Group blocks that are on the same horizontal line
@@ -270,8 +348,15 @@ export function formatOCRTextSimple(blocks: OCRBlock[], fullText: string): strin
     return fullText;
   }
 
-  // Sort blocks by vertical position
-  const sortedBlocks = [...blocks].sort((a, b) => a.boundingBox.y - b.boundingBox.y);
+  // Sort blocks by vertical position (top to bottom), then right to left for Arabic
+  const sortedBlocks = [...blocks].sort((a, b) => {
+    const yDiff = a.boundingBox.y - b.boundingBox.y;
+    if (Math.abs(yDiff) < 20) { // Same line threshold
+      // For Arabic RTL: sort by X position (right to left - higher X first)
+      return b.boundingBox.x - a.boundingBox.x;
+    }
+    return yDiff; // Top to bottom
+  });
   
   let formatted = '';
   let previousY = 0;

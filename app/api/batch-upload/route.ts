@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
           maxWidth: 3000,
           maxHeight: 4000,
         });
-        
+
         const buffer = compression.buffer;
         console.log(`[Compression] ${file.name}: ${formatBytes(compression.originalSize)} → ${formatBytes(compression.compressedSize)} (${compression.compressionRatio.toFixed(2)}x)`);
 
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
         };
       } catch (error) {
         console.error(`Failed to process ${file.name}:`, error);
-        
+
         // Add failed document to batch
         await Batch.findOneAndUpdate(
           { batchId },
@@ -184,9 +184,9 @@ async function processOCR(documentId: string, imageBuffer: Buffer, batchId: stri
     // Preprocess image for better OCR accuracy (Arabic-optimized)
     const preprocessed = await preprocessArabicDocument(imageBuffer);
     console.log(`[Preprocessing] Document ${documentId}: Applied ${preprocessed.appliedOperations.join(', ')}`);
-    
+
     // Perform OCR using Google Cloud Vision on preprocessed image
-    const ocrResult = await performOCRFromBuffer(preprocessed.buffer);
+    const ocrResult = await performOCRFromBuffer(preprocessed.buffer, { processColumns: false });
 
     // Update document with OCR results
     await connectDB();
@@ -225,7 +225,7 @@ async function processOCR(documentId: string, imageBuffer: Buffer, batchId: stri
     console.log(`OCR completed for document ${documentId} in batch ${batchId}`);
   } catch (error) {
     console.error(`OCR failed for document ${documentId}:`, error);
-    
+
     // Update document and batch to indicate OCR failure
     await Document.findByIdAndUpdate(documentId, {
       ocrText: '',
@@ -262,7 +262,7 @@ async function processOCR(documentId: string, imageBuffer: Buffer, batchId: stri
 export async function GET() {
   try {
     await connectDB();
-    
+
     const batches = await Batch.find()
       .sort({ createdAt: -1 })
       .limit(50)

@@ -510,14 +510,16 @@ Return JSON:
 }
 
 // System prompt for focused text correction detection (nonsense words only)
-const DETECTION_SYSTEM_PROMPT = `You are an expert Arabic linguist specializing in Classical Arabic (اللغة العربية الفصحى) and historical texts.
+const DETECTION_SYSTEM_PROMPT = `You are an expert Arabic linguist specializing in Classical Arabic (اللغة العربية الفصحى) and historical texts from old Egyptian journals and magazines.
 
 IMPORTANT CONTEXT:
-- This text is from HISTORICAL Arabic documents (old newspapers, magazines, literature)
+- This text is from HISTORICAL Arabic documents (old Egyptian newspapers, magazines, cinema journals from 1940s-1970s)
 - The language is Classical/Formal Arabic (الفصحى), NOT modern colloquial
+- Documents often have MULTIPLE COLUMNS - text may be arranged column by column
 - Old/archaic vocabulary is VALID and should NOT be corrected
 - Literary and poetic expressions are VALID
 - Historical spelling conventions are VALID
+- Cinema-related terms, actor names, movie titles are VALID even if unusual
 
 Your task is to:
 1. Find COMPLETELY GARBLED/CORRUPTED words from OCR errors
@@ -527,13 +529,19 @@ Your task is to:
 You MUST focus on:
 
 1. OCR GARBAGE (type: "ocr_error"):
-   - Random letter combinations that form NO Arabic word
-   - Severely corrupted text from bad scanning
-   - Words where letters are scrambled or missing
+   - Random letter combinations that form NO Arabic word (e.g., "لطخض", "قشطم", "بخضط")
+   - Severely corrupted text from bad scanning (missing letters, scrambled)
+   - Common OCR errors in old journals:
+     * ء/ئ/ؤ confusion (e.g., "مئثلة" should be "ممثلة")
+     * ة/ه confusion (e.g., "ممثله" should be "ممثلة")
+     * ى/ي confusion (e.g., "ممثل" should be "ممثلي")
+     * Missing dots (e.g., "ن" misread as "ر")
+     * Broken letters (e.g., "ف" misread as "ق")
+   - Words that make NO SENSE in context
 
 2. EMAILS & WEBSITES TO REMOVE (type: "ocr_error"):
-   - Any email address (e.g., name@domain.com)
-   - Any website URL (e.g., www.example.com, http://...)
+   - Any email address (e.g., name@domain.com, info@example.org)
+   - Any website URL (e.g., www.example.com, http://..., https://...)
    - These should be REMOVED (corrected = empty string "")
 
 FOR EACH ERROR YOU FIND:
@@ -541,23 +549,40 @@ FOR EACH ERROR YOU FIND:
 - "corrected": the CORRECT ARABIC WORD, or "" (empty) for emails/websites
 - For emails/websites: set corrected to "" to remove them
 - Use surrounding context to determine what corrupted words should be
+- Consider column structure - text may flow column by column
+
+EXAMPLES OF VALID CORRECTIONS:
+- "المبلة" → "الممثلة" (OCR misread ب as م, missing dot)
+- "فاطن" → "فاطن" (if context suggests actress name, but check if it's actually "فاطمة")
+- "example@email.com" → "" (remove email)
+- "www.site.com" → "" (remove website)
 
 ABSOLUTELY DO NOT FLAG:
-- Classical Arabic vocabulary - even if archaic/old
+- Classical Arabic vocabulary - even if archaic/old (e.g., "أفندي", "باشا", "بيك")
 - Literary/poetic expressions
-- Historical names, places, titles
+- Historical names, places, titles (e.g., "عبد الحليم", "أم كلثوم", "فريد الأطرش")
+- Cinema terms and names (e.g., "ستوديو", "سيناريو", "إخراج")
 - Arabic diacritics/tashkeel
-- Letter variations (ة/ه, ى/ي, أ/إ/آ/ا, ء/ئ/ؤ)
-- Old spelling conventions
+- Letter variations (ة/ه, ى/ي, أ/إ/آ/ا, ء/ئ/ؤ) - these are often valid in old texts
+- Old spelling conventions (e.g., "مصر" vs "مصر", "قاهرة" vs "القاهرة")
 - Punctuation, numbers, dates
-- Any word that EXISTS in Arabic
+- Any word that EXISTS in Arabic dictionaries or historical texts
+- Column separators or formatting artifacts
 
 ONLY flag a word if:
-- It is COMPLETE OCR GARBAGE
-- You CAN determine what it SHOULD be from context
-- You are 99%+ confident
+- It is COMPLETE OCR GARBAGE (random letters, no meaning)
+- You CAN determine what it SHOULD be from context with 99%+ confidence
+- The correction makes clear sense in the surrounding text
+- It's clearly a scanning/OCR error, not a valid historical variant
 
-Remember: Classical Arabic has rich vocabulary. When in doubt, DO NOT flag.
+VALIDATION CHECKLIST before flagging:
+1. Is this word completely meaningless? (not just unusual)
+2. Can I determine the correct word from context? (not guessing)
+3. Is my confidence 99%+? (not 80% or 90%)
+4. Is this clearly an OCR error, not a valid historical spelling?
+5. Would a native Arabic speaker agree this is garbage?
+
+Remember: Classical Arabic has rich vocabulary. Old journals use formal language. When in doubt, DO NOT flag.
 
 Output ONLY valid JSON with no additional text.`;
 
@@ -605,18 +630,41 @@ export async function detectTextCorrections(
         },
         {
           role: 'user',
-          content: `This is HISTORICAL Arabic text (الفصحى - Classical Arabic). Find OCR garbage AND emails/websites to remove.
+          content: `This is HISTORICAL Arabic text from old Egyptian journals (الفصحى - Classical Arabic). The text may be arranged in multiple columns. Find OCR garbage AND emails/websites to remove.
 
-IMPORTANT:
-- This is Classical/Formal Arabic from old documents
-- Old/archaic vocabulary is VALID - do not flag
+IMPORTANT CONTEXT:
+- This is Classical/Formal Arabic from old Egyptian cinema journals/newspapers (1940s-1970s)
+- Text may be arranged in COLUMNS - read column by column (right-to-left for Arabic)
+- Old/archaic vocabulary is VALID - do not flag (e.g., "أفندي", "باشا", "بيك")
 - Literary expressions are VALID - do not flag
-- ONLY flag words that are COMPLETE OCR GARBAGE
+- Historical names and cinema terms are VALID - do not flag
+- ONLY flag words that are COMPLETE OCR GARBAGE (random letters, no meaning)
 - REMOVE all email addresses and website URLs
 
+COMMON OCR ERRORS IN OLD JOURNALS:
+- Missing dots: "ن" → "ر", "ب" → "ت", "ث" → "ن"
+- Letter confusion: "ء/ئ/ؤ", "ة/ه", "ى/ي"
+- Broken letters from poor scanning
+- Scrambled words with no meaning
+
 FOR EACH ERROR:
-1. For OCR garbage: suggest the correct Arabic word
+1. For OCR garbage: suggest the correct Arabic word based on context
 2. For emails/websites: set corrected to "" (empty string) to REMOVE them
+3. Only flag if you are 99%+ confident it's an error
+
+CRITICAL POSITION ACCURACY REQUIREMENTS:
+1. Before reporting any correction, VERIFY the word exists at the position you specify
+2. The "original" field MUST be EXACTLY what appears at text[position.start] to text[position.end]
+3. Count characters carefully - use the EXACT substring from the text
+4. If you cannot find the exact position, DO NOT include that correction
+5. For emails/URLs: Only flag if you can see the actual email/URL at that position
+
+CRITICAL CORRECTION ACCURACY:
+1. For OCR errors: Provide a MEANINGFUL correction based on context
+2. If you cannot determine the correct word with high confidence, DO NOT suggest a correction
+3. Empty "corrected" field is ONLY for emails/URLs that should be removed
+4. For OCR garbage: Suggest the most likely correct word based on surrounding context
+5. Do NOT suggest corrections that don't make sense in the context
 
 Return JSON:
 {
@@ -653,6 +701,22 @@ Return JSON:
   "correctedText": "text with corrections and emails/websites removed",
   "confidence": 0.0 to 1.0
 }
+
+STEP-BY-STEP PROCESS FOR EACH ERROR:
+1. Read the text carefully and identify a word that is clearly OCR garbage or an email/URL
+2. Find the EXACT position where this word appears in the text
+3. Extract the EXACT substring at that position: text.substring(position.start, position.end)
+4. Verify that "original" matches this exact substring
+5. For OCR errors: Determine the correct word from context, or leave empty if uncertain
+6. For emails/URLs: Set "corrected" to "" (empty string) to remove them
+7. Only include corrections where you are 99%+ confident about both the position AND the correction
+
+VALIDATION CHECKLIST (must pass all):
+- [ ] The word at position.start to position.end matches "original" exactly
+- [ ] For OCR errors: You can suggest a meaningful correction based on context
+- [ ] For emails/URLs: The text at position actually contains @, www., or http
+- [ ] The correction makes sense in the surrounding text context
+- [ ] You are 99%+ confident about both position and correction
 
 Classical Arabic text to analyze:
 ${processedText}`,
@@ -752,8 +816,74 @@ ${processedText}`,
       }
     }
     
+    // Helper function to find and validate word position in text
+    const findWordPosition = (word: string, suggestedStart: number, suggestedEnd: number, text: string): { start: number; end: number; found: boolean } => {
+      if (!word || word.trim().length === 0) {
+        return { start: suggestedStart, end: suggestedEnd, found: false };
+      }
+
+      const trimmedWord = word.trim();
+      
+      // First, check if the word exists at the suggested position
+      const textAtPosition = text.slice(suggestedStart, suggestedEnd).trim();
+      if (textAtPosition === trimmedWord || textAtPosition.includes(trimmedWord)) {
+        // Word matches at position, but need to find exact boundaries
+        const exactStart = text.indexOf(trimmedWord, Math.max(0, suggestedStart - 100));
+        if (exactStart !== -1 && Math.abs(exactStart - suggestedStart) < 200) {
+          return { start: exactStart, end: exactStart + trimmedWord.length, found: true };
+        }
+        // If exact match not found, use suggested position if text matches
+        if (textAtPosition === trimmedWord) {
+          return { start: suggestedStart, end: suggestedEnd, found: true };
+        }
+      }
+      
+      // Search near the suggested position (within 500 chars)
+      const searchStart = Math.max(0, suggestedStart - 500);
+      const searchEnd = Math.min(text.length, suggestedEnd + 500);
+      const searchArea = text.slice(searchStart, searchEnd);
+      
+      // Try exact match first
+      let wordIndex = searchArea.indexOf(trimmedWord);
+      if (wordIndex !== -1) {
+        const actualStart = searchStart + wordIndex;
+        return { start: actualStart, end: actualStart + trimmedWord.length, found: true };
+      }
+      
+      // Try case-insensitive match (for emails/URLs)
+      const lowerWord = trimmedWord.toLowerCase();
+      const lowerSearchArea = searchArea.toLowerCase();
+      wordIndex = lowerSearchArea.indexOf(lowerWord);
+      if (wordIndex !== -1) {
+        const actualStart = searchStart + wordIndex;
+        return { start: actualStart, end: actualStart + trimmedWord.length, found: true };
+      }
+      
+      // Try finding word with word boundaries (for emails, URLs, etc.)
+      // For emails/URLs, they might have different formatting
+      if (trimmedWord.includes('@') || trimmedWord.includes('www.') || trimmedWord.includes('http')) {
+        // For emails/URLs, search more flexibly
+        const emailPattern = new RegExp(trimmedWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        const match = searchArea.match(emailPattern);
+        if (match && match.index !== undefined) {
+          const actualStart = searchStart + match.index;
+          return { start: actualStart, end: actualStart + match[0].length, found: true };
+        }
+      }
+      
+      // Last resort: search entire text
+      wordIndex = text.indexOf(trimmedWord);
+      if (wordIndex !== -1) {
+        return { start: wordIndex, end: wordIndex + trimmedWord.length, found: true };
+      }
+      
+      // Word not found - return suggested position but mark as not found
+      return { start: suggestedStart, end: suggestedEnd, found: false };
+    };
+
     // Filter corrections by confidence threshold and normalize
     // Also filter out corrections where original and corrected are the same
+    // AND validate/correct positions to match actual word locations
     const corrections: AICorrection[] = (result.corrections || [])
       .filter((c: { confidence?: number; original?: string; corrected?: string }) => {
         const meetsConfidence = (c.confidence || 0) >= confidenceThreshold;
@@ -763,19 +893,101 @@ ${processedText}`,
         const hasActualChange = c.original?.trim() !== c.corrected?.trim();
         return meetsConfidence && hasOriginal && (isRemoval || hasActualChange);
       })
-      .map((c: { id?: string; type?: string; original?: string; corrected?: string; reason?: string; position?: { start?: number; end?: number }; confidence?: number }, index: number) => ({
-        id: c.id || `correction_${index}`,
-        type: (c.type as CorrectionType) || 'ocr_error',
-        original: c.original || '',
-        corrected: c.corrected || '',
-        reason: c.reason || '',
-        position: {
-          start: c.position?.start || 0,
-          end: c.position?.end || 0,
-        },
-        confidence: c.confidence || 0.95,
-        status: 'pending' as const,
-      }));
+      .map((c: { id?: string; type?: string; original?: string; corrected?: string; reason?: string; position?: { start?: number; end?: number }; confidence?: number }, index: number) => {
+        const originalWord = (c.original || '').trim();
+        const suggestedStart = c.position?.start || 0;
+        const suggestedEnd = c.position?.end || suggestedStart + originalWord.length;
+        
+        // Find and validate the actual position of the word
+        const validatedPosition = findWordPosition(originalWord, suggestedStart, suggestedEnd, processedText);
+        
+        // Get the actual text at the validated position
+        const actualTextAtPosition = processedText.slice(validatedPosition.start, validatedPosition.end).trim();
+        
+        return {
+          id: c.id || `correction_${index}`,
+          type: (c.type as CorrectionType) || 'ocr_error',
+          original: originalWord,
+          corrected: (c.corrected || '').trim(),
+          reason: c.reason || '',
+          position: {
+            start: validatedPosition.start,
+            end: validatedPosition.end,
+          },
+          confidence: c.confidence || 0.95,
+          status: 'pending' as const,
+          // Store actual text at position for validation
+          _actualTextAtPosition: actualTextAtPosition,
+          _positionValid: validatedPosition.found,
+        };
+      })
+      // STRICTLY filter out corrections where the word doesn't match the position
+      .filter((correction: any) => {
+        const actualText = correction._actualTextAtPosition || '';
+        const detectedWord = correction.original;
+        const correctedWord = correction.corrected.trim();
+        
+        // For emails/URLs, check if the actual text contains email/URL patterns
+        const isEmailOrUrl = detectedWord.includes('@') || 
+                            detectedWord.includes('www.') || 
+                            detectedWord.includes('http');
+        
+        if (isEmailOrUrl) {
+          // For emails/URLs, verify the actual text at position also contains email/URL patterns
+          const actualIsEmailOrUrl = actualText.includes('@') || 
+                                     actualText.includes('www.') || 
+                                     actualText.includes('http');
+          
+          if (!actualIsEmailOrUrl) {
+            console.warn(`[AI Correction] Email/URL "${detectedWord}" detected but actual text at position is "${actualText}". Rejecting.`);
+            return false;
+          }
+          
+          // Check if they're similar (case-insensitive, allow partial matches)
+          const lowerDetected = detectedWord.toLowerCase();
+          const lowerActual = actualText.toLowerCase();
+          const matches = lowerActual.includes(lowerDetected) || lowerDetected.includes(lowerActual);
+          
+          if (!matches) {
+            console.warn(`[AI Correction] Email/URL "${detectedWord}" doesn't match actual text "${actualText}". Rejecting.`);
+            return false;
+          }
+          
+          // For emails/URLs, corrected should be empty (for deletion)
+          return correctedWord === '';
+        }
+        
+        // For regular OCR errors, require a meaningful correction
+        if (correctedWord === '' || correctedWord === detectedWord) {
+          console.warn(`[AI Correction] No meaningful correction provided for "${detectedWord}". Rejecting.`);
+          return false;
+        }
+        
+        // For regular words, require exact or very close match at position
+        // If position was found, the word should match
+        if (correction._positionValid) {
+          // Word was found at position - allow it
+          return true;
+        }
+        
+        // Word not found at position - check if actual text is similar (for OCR errors)
+        // Only allow if the actual text is clearly different (OCR error scenario)
+        const textsAreSimilar = actualText === detectedWord ||
+                               actualText.includes(detectedWord) ||
+                               detectedWord.includes(actualText) ||
+                               (actualText.length > 0 && detectedWord.length > 0 && 
+                                Math.abs(actualText.length - detectedWord.length) <= 3 &&
+                                actualText.length > 2 && detectedWord.length > 2);
+        
+        if (!textsAreSimilar) {
+          console.warn(`[AI Correction] Word "${detectedWord}" doesn't match actual text "${actualText}" at position. Rejecting.`);
+          return false;
+        }
+        
+        return true;
+      })
+      // Remove internal validation fields
+      .map(({ _actualTextAtPosition, _positionValid, ...correction }) => correction);
 
     // Normalize formatting changes
     const formattingChanges: FormattingChange[] = (result.formattingChanges || [])
@@ -806,22 +1018,32 @@ ${processedText}`,
   }
 }
 
-// Apply approved corrections to text
+// Apply approved and deleted corrections to text
 export function applyApprovedCorrections(
   originalText: string,
   corrections: AICorrection[]
 ): string {
-  // Sort corrections by position (end to start) to avoid position shifts
-  const approvedCorrections = corrections
-    .filter(c => c.status === 'approved')
+  // Get approved and deleted corrections (both need to be applied)
+  const approvedCorrections = corrections.filter(c => c.status === 'approved');
+  const deletedCorrections = corrections.filter(c => c.status === 'deleted');
+  
+  // Combine and sort by position (end to start) to avoid position shifts
+  const allChanges = [...approvedCorrections, ...deletedCorrections]
     .sort((a, b) => b.position.start - a.position.start);
 
   let result = originalText;
   
-  for (const correction of approvedCorrections) {
+  for (const correction of allChanges) {
     const before = result.slice(0, correction.position.start);
     const after = result.slice(correction.position.end);
-    result = before + correction.corrected + after;
+    
+    if (correction.status === 'deleted') {
+      // Delete: remove text completely (corrected should be empty string)
+      result = before + (correction.corrected || '') + after;
+    } else {
+      // Approve: apply correction
+      result = before + correction.corrected + after;
+    }
   }
   
   return result;
